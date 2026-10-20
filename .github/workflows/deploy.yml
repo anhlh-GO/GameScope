@@ -27,8 +27,10 @@ jobs:
           HASH: ${{ secrets.GP_PASSWORD_SHA256 }}
         run: |
           if [ -z "$HASH" ]; then echo "::error::Secret GP_PASSWORD_SHA256 chưa được tạo"; exit 1; fi
-          sed -i -E "s/passwordSha256: \"[0-9a-f]*\"/passwordSha256: \"$HASH\"/" config.js
-          grep -q "$HASH" config.js
+          HASH=$(printf '%s' "$HASH" | tr -d '[:space:]' | tr 'A-F' 'a-f')
+          if ! printf '%s' "$HASH" | grep -Eq '^[0-9a-f]{64}$'; then echo "::error::GP_PASSWORD_SHA256 phải là chuỗi hex 64 ký tự"; exit 1; fi
+          sed -i -E "s/passwordSha256: \"[^\"]*\"/passwordSha256: \"$HASH\"/" config.js
+          grep -q "$HASH" config.js || { echo "::error::Không chèn được hash vào config.js"; exit 1; }
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
