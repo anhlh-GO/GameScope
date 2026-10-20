@@ -1,0 +1,24 @@
+import React from "react";
+import { Icon } from "./Icon.jsx";
+
+export function SegmentedControl({ options = [], value, onChange, size = "sm", style }) {
+  const h = size === "sm" ? 26 : 30;
+  return (
+    <div role="radiogroup" style={{ display: "inline-flex", padding: 2, gap: 2, borderRadius: "var(--radius-md)", background: "var(--bg-sunken)", border: "1px solid var(--border-subtle)", ...style }}>
+      {options.map(function (o) {
+        const opt = typeof o === "string" ? { value: o, label: o } : o;
+        const on = opt.value === value;
+        return (
+          <button key={opt.value} role="radio" aria-checked={on} disabled={opt.disabled} title={opt.title}
+            onClick={function () { if (!opt.disabled && onChange) onChange(opt.value); }}
+            style={{ height: h, padding: "0 10px", border: 0, borderRadius: 6, display: "inline-flex", alignItems: "center", gap: 5,
+              background: on ? "var(--bg-raised)" : "transparent", boxShadow: on ? "var(--shadow-sm), inset 0 0 0 1px var(--border-default)" : "none",
+              color: on ? "var(--text-primary)" : "var(--text-tertiary)", font: "500 12px/1 var(--font-sans)", cursor: opt.disabled ? "not-allowed" : "pointer",
+              opacity: opt.disabled ? 0.45 : 1, whiteSpace: "nowrap" }}>
+            {opt.icon ? <Icon name={opt.icon} size={13} /> : null}{opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}

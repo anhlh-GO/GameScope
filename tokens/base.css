@@ -1,0 +1,13 @@
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg-app);color:var(--text-primary);font:var(--type-body);font-feature-settings:'ss01','cv11';-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+a{color:var(--accent-text);text-decoration:none}
+a:hover{color:var(--accent-hover);text-decoration:underline;text-underline-offset:2px}
+::selection{background:var(--accent-soft);color:var(--text-primary)}
+.gp-num{font-variant-numeric:tabular-nums}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:10px;border:3px solid transparent;background-clip:padding-box}
+*::-webkit-scrollbar-track{background:transparent}
+@keyframes gp-shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes gp-spin{to{transform:rotate(360deg)}}
+@keyframes gp-fade-up{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}

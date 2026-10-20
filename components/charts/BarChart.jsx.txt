@@ -1,0 +1,96 @@
+import React from "react";
+
+function useWidth(initial) {
+  const ref = React.useRef(null);
+  const [w, setW] = React.useState(initial || 600);
+  React.useLayoutEffect(function () {
+    const el = ref.current; if (!el) return;
+    setW(el.clientWidth || initial || 600);
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(function (e) { const cw = e[0].contentRect.width; if (cw > 0) setW(cw); });
+    ro.observe(el);
+    return function () { ro.disconnect(); };
+  }, []);
+  return [ref, w];
+}
+function niceStep(r) { if (!(r > 0)) return 1; const e = Math.pow(10, Math.floor(Math.log10(r))); const f = r / e; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * e; }
+function niceExtent(mn, mx, ticks) { if (mx === mn) { mx = mn + 1; } const st = niceStep((mx - mn) / (ticks || 4)); return [Math.floor(mn / st) * st, Math.ceil(mx / st) * st, st]; }
+
+export function BarChart({ data = [], series = [], xKey = "x", height = 220, stacked = false, horizontal = false, yFormat, xFormat, showLegend, onBarClick, highlightKey, maxBars, labelWidth = 120, emptyText = "No data for this selection", style }) {
+  const [ref, w] = useWidth(600);
+  const [hi, setHi] = React.useState(null);
+  const fy = yFormat || function (v) { return String(Math.round(v * 100) / 100); };
+  const fx = xFormat || function (v) { return v; };
+  const rows = maxBars ? data.slice(0, maxBars) : data;
+  const legend = showLegend == null ? series.length > 1 : showLegend;
+  const tot = function (d) { return series.reduce(function (a, s) { return a + (d[s.key] || 0); }, 0); };
+  if (!rows.length) return <div style={{ height: horizontal ? 120 : height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-tertiary)", font: "var(--type-body)" }}>{emptyText}</div>;
+  const Legend = legend ? (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginTop: 10 }}>
+      {series.map(function (s) { return <span key={s.key} style={{ display: "inline-flex", alignItems: "center", gap: 6, font: "400 12px/1 var(--font-sans)", color: "var(--text-secondary)" }}><span style={{ width: 10, height: 10, borderRadius: 3, background: s.color }}></span>{s.label}</span>; })}
+    </div>) : null;
+  if (horizontal) {
+    const mx = Math.max.apply(null, rows.map(function (d) { return stacked ? tot(d) : Math.max.apply(null, series.map(function (s) { return d[s.key] || 0; })); })) || 1;
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, minWidth: 0, ...style }}>
+        {rows.map(function (d, i) {
+          const on = highlightKey != null && d[xKey] === highlightKey;
+          return (
+            <div key={i} onClick={onBarClick ? function () { onBarClick(d); } : undefined} onMouseEnter={function () { setHi(i); }} onMouseLeave={function () { setHi(null); }}
+              style={{ display: "grid", gridTemplateColumns: labelWidth + "px minmax(0,1fr) auto", alignItems: "center", gap: 10, cursor: onBarClick ? "pointer" : "default", opacity: hi != null && hi !== i ? 0.6 : 1 }}>
+              <span style={{ font: "400 12px/1.2 var(--font-sans)", color: on ? "var(--text-primary)" : "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fx(d[xKey])}</span>
+              <span style={{ display: "flex", height: 14, gap: stacked ? 1 : 2, flexDirection: stacked ? "row" : "column" }}>
+                {series.map(function (s) { const v = d[s.key] || 0; return <span key={s.key} title={s.label + ": " + fy(v)} style={{ display: "block", width: (v / mx * 100) + "%", height: stacked ? "100%" : (14 / series.length - 1), background: s.color, borderRadius: 3, minWidth: v > 0 ? 2 : 0 }}></span>; })}
+              </span>
+              <span style={{ font: "500 12px/1 var(--font-sans)", color: "var(--text-primary)", fontVariantNumeric: "tabular-nums", textAlign: "right", minWidth: 56 }}>{fy(stacked || series.length === 1 ? tot(d) : d[series[0].key])}</span>
+            </div>
+          );
+        })}
+        {Legend}
+      </div>
+    );
+  }
+  const padL = 52, padR = 10, padT = 10, padB = 26;
+  const iw = Math.max(10, w - padL - padR), ih = height - padT - padB;
+  let mx = 0, mn = 0;
+  rows.forEach(function (d) { if (stacked) mx = Math.max(mx, tot(d)); else series.forEach(function (s) { mx = Math.max(mx, d[s.key] || 0); mn = Math.min(mn, d[s.key] || 0); }); });
+  const e = niceExtent(mn, mx || 1, 4);
+  function Y(v) { return padT + ih - (v - e[0]) / (e[1] - e[0]) * ih; }
+  const band = iw / rows.length, gap = Math.min(8, band * 0.25), bw = band - gap;
+  const ticks = []; for (let t = e[0]; t <= e[1] + 1e-9; t += e[2]) ticks.push(t);
+  const every = Math.max(1, Math.ceil(rows.length / Math.max(2, Math.floor(iw / 56))));
+  const row = hi != null ? rows[hi] : null;
+  return (
+    <div style={{ minWidth: 0, ...style }}>
+      <div ref={ref} style={{ position: "relative", height: height }} onMouseLeave={function () { setHi(null); }}>
+        <svg width={w} height={height} style={{ display: "block", overflow: "visible" }}>
+          {ticks.map(function (t) { return <g key={t}><line x1={padL} x2={padL + iw} y1={Y(t)} y2={Y(t)} stroke="var(--chart-grid)" /><text x={padL - 8} y={Y(t)} dy="0.32em" textAnchor="end" fill="var(--chart-axis)" style={{ font: "400 10.5px var(--font-sans)", fontVariantNumeric: "tabular-nums" }}>{fy(t)}</text></g>; })}
+          {rows.map(function (d, i) {
+            const x0 = padL + i * band + gap / 2; let acc = 0;
+            const dim = (hi != null && hi !== i) || (highlightKey != null && d[xKey] !== highlightKey);
+            return (
+              <g key={i} onMouseEnter={function () { setHi(i); }} onClick={onBarClick ? function () { onBarClick(d); } : undefined} style={{ cursor: onBarClick ? "pointer" : "default" }} opacity={dim ? 0.55 : 1}>
+                <rect x={padL + i * band} y={padT} width={band} height={ih} fill="transparent" />
+                {series.map(function (s, si) {
+                  const v = d[s.key] || 0;
+                  if (stacked) { const y1 = Y(acc + v), y0 = Y(acc); acc += v; return <rect key={s.key} x={x0} y={y1} width={bw} height={Math.max(0, y0 - y1)} fill={s.color} rx={si === series.length - 1 ? 2 : 0} />; }
+                  const sw = bw / series.length; const y = Y(Math.max(0, v)); return <rect key={s.key} x={x0 + si * sw} y={y} width={Math.max(1, sw - 1)} height={Math.abs(Y(v) - Y(0))} fill={s.color} rx="2" />;
+                })}
+              </g>
+            );
+          })}
+          {rows.map(function (d, i) { return i % every === 0 ? <text key={"x" + i} x={padL + i * band + band / 2} y={height - 8} textAnchor="middle" fill="var(--chart-axis)" style={{ font: "400 10.5px var(--font-sans)" }}>{fx(d[xKey])}</text> : null; })}
+        </svg>
+        {row ? (
+          <div style={{ position: "absolute", top: 4, left: padL + hi * band + band / 2 > w / 2 ? undefined : padL + (hi + 1) * band + 6, right: padL + hi * band + band / 2 > w / 2 ? w - padL - hi * band + 6 : undefined,
+            pointerEvents: "none", zIndex: 2, minWidth: 140, padding: "8px 10px", borderRadius: "var(--radius-md)", background: "var(--bg-tooltip)", boxShadow: "var(--shadow-md)", font: "400 12px/1.5 var(--font-sans)" }}>
+            <div style={{ color: "var(--text-tertiary)", fontSize: 11, marginBottom: 4 }}>{fx(row[xKey], true)}</div>
+            {series.map(function (s) { return <div key={s.key} style={{ display: "flex", gap: 8, alignItems: "center" }}><span style={{ width: 8, height: 8, borderRadius: 2, background: s.color }}></span><span style={{ flex: 1, color: "var(--text-secondary)" }}>{s.label}</span><span style={{ fontWeight: 500, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{fy(row[s.key] || 0)}</span></div>; })}
+            {stacked && series.length > 1 ? <div style={{ display: "flex", gap: 8, borderTop: "1px solid var(--border-subtle)", marginTop: 4, paddingTop: 4 }}><span style={{ flex: 1, color: "var(--text-secondary)" }}>Total</span><span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fy(tot(row))}</span></div> : null}
+          </div>
+        ) : null}
+      </div>
+      {Legend}
+    </div>
+  );
+}

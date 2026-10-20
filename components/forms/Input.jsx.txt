@@ -1,0 +1,19 @@
+import React from "react";
+import { Icon } from "../core/Icon.jsx";
+
+export function Input({ value, onChange, placeholder, type = "text", iconLeft, suffix, size = "md", invalid = false, disabled = false, autoFocus, name, onKeyDown, width, style }) {
+  const [focus, setFocus] = React.useState(false);
+  const h = { sm: 28, md: 32, lg: 40 }[size] || 32;
+  return (
+    <label style={{ display: "inline-flex", alignItems: "center", gap: 8, height: h, padding: "0 10px", width: width || "100%", borderRadius: "var(--radius-md)",
+      background: "var(--bg-sunken)", border: "1px solid " + (invalid ? "var(--negative)" : focus ? "var(--accent-border)" : "var(--border-default)"),
+      boxShadow: focus ? "0 0 0 3px var(--accent-soft)" : "none", color: "var(--text-tertiary)", opacity: disabled ? 0.5 : 1,
+      transition: "border-color var(--dur-fast), box-shadow var(--dur-fast)", ...style }}>
+      {iconLeft ? <Icon name={iconLeft} size={14} /> : null}
+      <input name={name} type={type} value={value == null ? "" : value} placeholder={placeholder} disabled={disabled} autoFocus={autoFocus} onKeyDown={onKeyDown}
+        onChange={function (e) { if (onChange) onChange(e.target.value, e); }} onFocus={function () { setFocus(true); }} onBlur={function () { setFocus(false); }}
+        style={{ flex: 1, minWidth: 0, height: "100%", border: 0, outline: "none", background: "transparent", color: "var(--text-primary)", font: "400 " + (size === "lg" ? 14 : 13) + "px/1 var(--font-sans)" }} />
+      {suffix ? <span style={{ font: "var(--type-caption)", color: "var(--text-tertiary)", flex: "none" }}>{suffix}</span> : null}
+    </label>
+  );
+}

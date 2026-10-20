@@ -1,0 +1,18 @@
+import React from "react";
+import { Icon } from "../core/Icon.jsx";
+
+export function Delta({ value, format = "percent", goodDirection = "up", size = "sm", decimals = 1, style }) {
+  if (value == null || !isFinite(value)) return <span style={{ font: "500 12px/1 var(--font-sans)", color: "var(--text-tertiary)", ...style }}>—</span>;
+  const flat = Math.abs(value) < (format === "pp" ? 0.0005 : 0.0005);
+  const up = value > 0;
+  const good = goodDirection === "neutral" || flat ? null : (goodDirection === "up") === up;
+  const color = good == null ? "var(--text-secondary)" : good ? "var(--positive)" : "var(--negative)";
+  const num = format === "pp" ? (Math.abs(value) * 100).toFixed(decimals) + " pp" : format === "abs" ? Math.abs(value).toLocaleString() : (Math.abs(value) * 100).toFixed(decimals) + "%";
+  const fs = size === "md" ? 13 : 12;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 2, color: color, font: "500 " + fs + "px/1 var(--font-sans)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", ...style }}>
+      <Icon name={flat ? "minus" : up ? "arrow-up-right" : "arrow-down-right"} size={fs} strokeWidth={2.2} />
+      {num}
+    </span>
+  );
+}

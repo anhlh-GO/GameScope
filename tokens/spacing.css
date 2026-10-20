@@ -1,0 +1,7 @@
+/* 8px system with 4px half-steps */
+:root{
+--space-0:0;--space-px:1px;--space-0-5:2px;--space-1:4px;--space-1-5:6px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;--space-10:40px;--space-12:48px;--space-16:64px;
+--radius-xs:4px;--radius-sm:6px;--radius-md:8px;--radius-lg:10px;--radius-xl:12px;--radius-2xl:14px;--radius-pill:999px;
+--control-h-sm:28px;--control-h-md:32px;--control-h-lg:40px;
+--sidebar-w:232px;--sidebar-w-collapsed:60px;--topbar-h:56px;--content-max:1600px;
+}

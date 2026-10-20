@@ -1,0 +1,38 @@
+import React from "react";
+import { Icon } from "./Icon.jsx";
+
+const SIZES = { sm: { h: 28, px: 10, fs: 12, ic: 14, gap: 6 }, md: { h: 32, px: 12, fs: 13, ic: 15, gap: 6 }, lg: { h: 40, px: 16, fs: 14, ic: 16, gap: 8 } };
+const VARIANTS = {
+  primary: { bg: "var(--accent)", bgH: "var(--accent-hover)", bgP: "var(--accent-press)", fg: "var(--text-on-accent)", fgH: "var(--text-on-accent)", bd: "transparent" },
+  secondary: { bg: "var(--bg-raised)", bgH: "var(--bg-active)", bgP: "var(--bg-active)", fg: "var(--text-primary)", fgH: "var(--text-primary)", bd: "var(--border-default)" },
+  ghost: { bg: "transparent", bgH: "var(--bg-hover)", bgP: "var(--bg-active)", fg: "var(--text-secondary)", fgH: "var(--text-primary)", bd: "transparent" },
+  danger: { bg: "var(--negative-soft)", bgH: "rgba(240,85,90,.2)", bgP: "rgba(240,85,90,.26)", fg: "var(--negative)", fgH: "var(--negative)", bd: "transparent" }
+};
+
+export function Button({ variant = "secondary", size = "md", iconLeft, iconRight, loading = false, disabled = false, fullWidth = false, type = "button", onClick, children, title, style }) {
+  const [hover, setHover] = React.useState(false);
+  const [press, setPress] = React.useState(false);
+  const [focus, setFocus] = React.useState(false);
+  const s = SIZES[size] || SIZES.md;
+  const v = VARIANTS[variant] || VARIANTS.secondary;
+  const off = disabled || loading;
+  return (
+    <button type={type} title={title} disabled={off} onClick={off ? undefined : onClick}
+      onMouseEnter={function () { setHover(true); }} onMouseLeave={function () { setHover(false); setPress(false); }}
+      onMouseDown={function () { setPress(true); }} onMouseUp={function () { setPress(false); }}
+      onFocus={function (e) { setFocus(e.target.matches(":focus-visible")); }} onBlur={function () { setFocus(false); }}
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center", gap: s.gap, height: s.h, padding: "0 " + s.px + "px",
+        width: fullWidth ? "100%" : undefined, borderRadius: "var(--radius-md)", border: "1px solid " + v.bd,
+        background: off ? v.bg : press ? v.bgP : hover ? v.bgH : v.bg, color: hover && !off ? v.fgH : v.fg,
+        font: "500 " + s.fs + "px/1 var(--font-sans)", letterSpacing: "-0.005em", whiteSpace: "nowrap", cursor: off ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.45 : 1, boxShadow: focus ? "var(--focus-ring)" : variant === "secondary" ? "var(--shadow-xs)" : "none",
+        transition: "background var(--dur-fast) var(--ease-out), color var(--dur-fast)", outline: "none", ...style
+      }}>
+      {loading ? <span style={{ width: s.ic - 2, height: s.ic - 2, borderRadius: "50%", border: "1.5px solid currentColor", borderRightColor: "transparent", animation: "gp-spin .7s linear infinite" }}></span>
+        : iconLeft ? <Icon name={iconLeft} size={s.ic} /> : null}
+      {children}
+      {iconRight ? <Icon name={iconRight} size={s.ic} /> : null}
+    </button>
+  );
+}

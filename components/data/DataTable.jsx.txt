@@ -1,0 +1,77 @@
+import React from "react";
+import { Icon } from "../core/Icon.jsx";
+
+function cmp(a, b) { if (a == null && b == null) return 0; if (a == null) return 1; if (b == null) return -1; return typeof a === "string" ? a.localeCompare(b) : a - b; }
+
+export function DataTable({ columns = [], rows = [], rowKey = "id", initialSort, pageSize = 0, onRowClick, dense = false, maxHeight, emptyText = "No rows match the current filters.", rowStyle, footerNote, style }) {
+  const [sort, setSort] = React.useState(initialSort || null);
+  const [page, setPage] = React.useState(0);
+  React.useEffect(function () { setPage(0); }, [rows.length]);
+  const sorted = React.useMemo(function () {
+    if (!sort) return rows;
+    const col = columns.find(function (c) { return c.key === sort.key; });
+    const get = col && col.sortValue ? col.sortValue : function (r) { return r[sort.key]; };
+    const out = rows.slice().sort(function (a, b) { return cmp(get(a), get(b)); });
+    return sort.dir === "desc" ? out.reverse() : out;
+  }, [rows, sort, columns]);
+  const pages = pageSize ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
+  const view = pageSize ? sorted.slice(page * pageSize, page * pageSize + pageSize) : sorted;
+  const ph = dense ? "7px 10px" : "10px 12px";
+  function toggle(c) {
+    if (c.sortable === false) return;
+    setSort(function (s) { return !s || s.key !== c.key ? { key: c.key, dir: c.align === "left" || !c.align && c.key === columns[0].key ? "asc" : "desc" } : { key: c.key, dir: s.dir === "desc" ? "asc" : "desc" }; });
+  }
+  return (
+    <div style={{ minWidth: 0, ...style }}>
+      <div style={{ overflowX: "auto", overflowY: maxHeight ? "auto" : "hidden", maxHeight: maxHeight, borderRadius: "var(--radius-lg)", border: "1px solid var(--border-subtle)" }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, font: "400 13px/1.3 var(--font-sans)", fontVariantNumeric: "tabular-nums" }}>
+          <thead>
+            <tr>
+              {columns.map(function (c) {
+                const on = sort && sort.key === c.key;
+                return (
+                  <th key={c.key} onClick={function () { toggle(c); }} style={{ position: "sticky", top: 0, zIndex: 1, background: "var(--bg-raised)", padding: ph, width: c.width,
+                    textAlign: c.align || "right", whiteSpace: "nowrap", font: "500 11.5px/1.2 var(--font-sans)", color: on ? "var(--text-primary)" : "var(--text-tertiary)",
+                    borderBottom: "1px solid var(--border-default)", cursor: c.sortable === false ? "default" : "pointer", userSelect: "none" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexDirection: (c.align || "right") === "right" ? "row-reverse" : "row" }}>
+                      {c.header}
+                      {c.sortable === false ? null : <Icon name={on ? (sort.dir === "desc" ? "arrow-down" : "arrow-up") : "chevrons-up-down"} size={11} style={{ opacity: on ? 1 : 0.5 }} />}
+                    </span>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {view.map(function (r, i) {
+              return (
+                <tr key={r[rowKey] != null ? r[rowKey] : i} onClick={onRowClick ? function () { onRowClick(r); } : undefined}
+                  onMouseEnter={function (e) { e.currentTarget.style.background = "var(--bg-hover)"; }} onMouseLeave={function (e) { e.currentTarget.style.background = "transparent"; }}
+                  style={{ cursor: onRowClick ? "pointer" : "default", ...(rowStyle ? rowStyle(r) : null) }}>
+                  {columns.map(function (c) {
+                    const v = c.render ? c.render(r) : c.format ? c.format(r[c.key], r) : r[c.key];
+                    return <td key={c.key} style={{ padding: ph, textAlign: c.align || "right", borderBottom: "1px solid var(--border-subtle)", color: "var(--text-primary)", whiteSpace: c.wrap ? "normal" : "nowrap", ...(c.cellStyle ? c.cellStyle(r) : null) }}>{v == null ? <span style={{ color: "var(--text-disabled)" }}>—</span> : v}</td>;
+                  })}
+                </tr>
+              );
+            })}
+            {view.length === 0 ? <tr><td colSpan={columns.length} style={{ padding: 28, textAlign: "center", color: "var(--text-tertiary)" }}>{emptyText}</td></tr> : null}
+          </tbody>
+        </table>
+      </div>
+      {pageSize && sorted.length > pageSize || footerNote ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 10, font: "var(--type-caption)", color: "var(--text-tertiary)" }}>
+          <span style={{ flex: 1 }}>{footerNote}</span>
+          {pageSize && sorted.length > pageSize ? (
+            <>
+              <span className="gp-num">{page * pageSize + 1}–{Math.min(sorted.length, (page + 1) * pageSize)} of {sorted.length}</span>
+              <button aria-label="Previous page" disabled={page === 0} onClick={function () { setPage(page - 1); }} style={pagerBtn(page === 0)}><Icon name="chevron-left" size={14} /></button>
+              <button aria-label="Next page" disabled={page >= pages - 1} onClick={function () { setPage(page + 1); }} style={pagerBtn(page >= pages - 1)}><Icon name="chevron-right" size={14} /></button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+function pagerBtn(off) { return { width: 26, height: 26, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: 6, border: "1px solid var(--border-default)", background: "var(--bg-raised)", color: "var(--text-secondary)", cursor: off ? "not-allowed" : "pointer", opacity: off ? 0.4 : 1 }; }

@@ -1,0 +1,36 @@
+import React from "react";
+import { Icon } from "../core/Icon.jsx";
+import { Tooltip } from "../feedback/Tooltip.jsx";
+import { Skeleton } from "../feedback/Skeleton.jsx";
+import { Delta } from "./Delta.jsx";
+import { Sparkline } from "./Sparkline.jsx";
+
+export function KpiCard({ label, value, delta, deltaFormat = "percent", goodDirection = "up", compareLabel = "vs prev. period", spark, color = "var(--accent)", info, source, updated, note, loading = false, active = false, onClick, style }) {
+  const [hover, setHover] = React.useState(false);
+  const click = !!onClick;
+  return (
+    <div onClick={onClick} onMouseEnter={function () { setHover(true); }} onMouseLeave={function () { setHover(false); }}
+      style={{ background: "var(--bg-surface)", border: "1px solid " + (active ? "var(--accent-border)" : hover && click ? "var(--border-strong)" : "var(--border-subtle)"),
+        borderRadius: "var(--radius-xl)", padding: "14px 14px 12px", display: "flex", flexDirection: "column", gap: 8, minWidth: 0, cursor: click ? "pointer" : "default",
+        transition: "border-color var(--dur-fast)", ...style }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+        <span style={{ font: "500 12px/1.2 var(--font-sans)", color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</span>
+        {info ? <Tooltip content={info}><span style={{ display: "inline-flex", color: "var(--text-tertiary)", cursor: "help" }}><Icon name="info" size={12} /></span></Tooltip> : null}
+        {note ? <span style={{ marginLeft: "auto" }}>{note}</span> : null}
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8, minWidth: 0 }}>
+        {loading ? <Skeleton width={88} height={26} /> : <div style={{ font: "var(--type-kpi)", letterSpacing: "var(--tracking-display)", color: "var(--text-primary)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{value}</div>}
+        {spark && !loading ? <Sparkline data={spark} color={color} width={64} height={26} style={{ flex: "none" }} /> : null}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+        {loading ? <Skeleton width={60} height={12} /> : <Delta value={delta} format={deltaFormat} goodDirection={goodDirection} />}
+        <span style={{ font: "var(--type-caption)", color: "var(--text-tertiary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{compareLabel}</span>
+      </div>
+      {source || updated ? (
+        <div style={{ display: "flex", gap: 6, font: "400 10.5px/1.2 var(--font-mono)", color: "var(--text-tertiary)", borderTop: "1px solid var(--border-subtle)", paddingTop: 8, marginTop: 2, whiteSpace: "nowrap", overflow: "hidden" }}>
+          {source ? <span>{source}</span> : null}{source && updated ? <span>·</span> : null}{updated ? <span>{updated}</span> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}

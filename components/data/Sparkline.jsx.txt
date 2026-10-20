@@ -1,0 +1,22 @@
+import React from "react";
+
+export function Sparkline({ data = [], color = "var(--accent)", width = 96, height = 28, area = true, strokeWidth = 1.5, style }) {
+  const id = React.useMemo(function () { return "sp" + Math.random().toString(36).slice(2, 8); }, []);
+  const pts = data.filter(function (v) { return v != null && isFinite(v); });
+  if (pts.length < 2) return <svg width={width} height={height} style={style}></svg>;
+  let mn = Math.min.apply(null, pts), mx = Math.max.apply(null, pts);
+  if (mx === mn) { mx += 1; mn -= 1; }
+  const n = data.length;
+  const xy = data.map(function (v, i) { return v == null ? null : [i / (n - 1) * width, 2 + (1 - (v - mn) / (mx - mn)) * (height - 4)]; });
+  let d = "";
+  xy.forEach(function (p, i) { if (!p) return; d += (d === "" || !xy[i - 1] ? "M" : "L") + p[0].toFixed(1) + "," + p[1].toFixed(1); });
+  const first = xy.find(Boolean), last = xy.slice().reverse().find(Boolean);
+  return (
+    <svg width={width} height={height} viewBox={"0 0 " + width + " " + height} style={{ display: "block", overflow: "visible", ...style }}>
+      <defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={color} stopOpacity=".22" /><stop offset="1" stopColor={color} stopOpacity="0" /></linearGradient></defs>
+      {area ? <path d={d + "L" + last[0] + "," + height + "L" + first[0] + "," + height + "Z"} fill={"url(#" + id + ")"} /> : null}
+      <path d={d} fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={last[0]} cy={last[1]} r="2" fill={color} />
+    </svg>
+  );
+}

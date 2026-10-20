@@ -1,0 +1,22 @@
+import React from "react";
+
+export function Tooltip({ content, children, placement = "top", maxWidth = 260 }) {
+  const ref = React.useRef(null);
+  const [pos, setPos] = React.useState(null);
+  function show() {
+    const el = ref.current; if (!el || !content) return;
+    const r = el.getBoundingClientRect();
+    setPos({ x: r.left + r.width / 2, y: placement === "bottom" ? r.bottom + 8 : r.top - 8 });
+  }
+  return (
+    <span ref={ref} onMouseEnter={show} onMouseLeave={function () { setPos(null); }} onFocus={show} onBlur={function () { setPos(null); }} style={{ display: "inline-flex" }}>
+      {children}
+      {pos ? (
+        <span role="tooltip" style={{ position: "fixed", left: Math.max(8 + maxWidth / 2, Math.min(pos.x, window.innerWidth - 8 - maxWidth / 2)), top: pos.y,
+          transform: "translate(-50%," + (placement === "bottom" ? "0" : "-100%") + ")", zIndex: "var(--z-popover)", maxWidth: maxWidth, width: "max-content",
+          padding: "7px 9px", borderRadius: "var(--radius-md)", background: "var(--bg-tooltip)", boxShadow: "var(--shadow-md)", color: "var(--text-secondary)",
+          font: "400 12px/1.45 var(--font-sans)", pointerEvents: "none", textAlign: "left", whiteSpace: "normal", animation: "gp-fade-up var(--dur-fast) var(--ease-out)" }}>{content}</span>
+      ) : null}
+    </span>
+  );
+}

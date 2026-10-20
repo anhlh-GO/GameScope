@@ -1,0 +1,25 @@
+import React from "react";
+import { Icon } from "../core/Icon.jsx";
+
+const T = {
+  info: ["var(--info-soft)", "var(--info)", "info"],
+  warning: ["var(--warning-soft)", "var(--warning)", "triangle-alert"],
+  negative: ["var(--negative-soft)", "var(--negative)", "octagon-alert"],
+  positive: ["var(--positive-soft)", "var(--positive)", "circle-check"],
+  neutral: ["var(--neutral-soft)", "var(--text-secondary)", "flask-conical"]
+};
+
+export function Callout({ tone = "info", title, children, icon, action, onDismiss, style }) {
+  const t = T[tone] || T.info;
+  return (
+    <div role="status" style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 12px", borderRadius: "var(--radius-lg)", background: t[0], ...style }}>
+      <span style={{ color: t[1], display: "inline-flex", paddingTop: 1 }}><Icon name={icon || t[2]} size={15} /></span>
+      <div style={{ flex: 1, minWidth: 0, font: "var(--type-body)", color: "var(--text-secondary)" }}>
+        {title ? <div style={{ font: "600 13px/1.4 var(--font-sans)", color: "var(--text-primary)" }}>{title}</div> : null}
+        {children}
+      </div>
+      {action ? <div style={{ flex: "none" }}>{action}</div> : null}
+      {onDismiss ? <button aria-label="Dismiss" onClick={onDismiss} style={{ border: 0, background: "none", color: "var(--text-tertiary)", cursor: "pointer", padding: 2, display: "inline-flex" }}><Icon name="x" size={14} /></button> : null}
+    </div>
+  );
+}

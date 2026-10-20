@@ -1,0 +1,38 @@
+import React from "react";
+
+export function Heatmap({ columns = [], rows = [], format, max, rowHeader = "Cohort", sizeHeader = "Users", naLabel = "N/A", onCellClick, style }) {
+  const f = format || function (v) { return (v * 100).toFixed(1) + "%"; };
+  const [hi, setHi] = React.useState(null);
+  let m = max;
+  if (m == null) { m = 0; rows.forEach(function (r) { r.values.forEach(function (v, i) { if (v != null && i > 0 && v > m) m = v; }); }); m = m || 1; }
+  return (
+    <div style={{ overflow: "auto", minWidth: 0, ...style }}>
+      <table style={{ borderCollapse: "separate", borderSpacing: 2, width: "100%", font: "400 11.5px/1 var(--font-sans)", fontVariantNumeric: "tabular-nums" }}>
+        <thead><tr>
+          <th style={hs("left")}>{rowHeader}</th><th style={hs("right")}>{sizeHeader}</th>
+          {columns.map(function (c) { return <th key={c} style={hs("center")}>{c}</th>; })}
+        </tr></thead>
+        <tbody>
+          {rows.map(function (r, ri) {
+            return (
+              <tr key={r.label}>
+                <td style={{ padding: "0 10px 0 0", color: "var(--text-secondary)", whiteSpace: "nowrap", height: 28 }}>{r.label}</td>
+                <td style={{ padding: "0 10px 0 0", color: "var(--text-tertiary)", textAlign: "right", whiteSpace: "nowrap" }}>{r.sizeLabel != null ? r.sizeLabel : r.size}</td>
+                {r.values.map(function (v, ci) {
+                  if (v == null) return <td key={ci} title="Cohort not old enough to observe this day" style={{ minWidth: 52, textAlign: "center", borderRadius: 4, color: "var(--text-disabled)", background: "repeating-linear-gradient(135deg, transparent 0 4px, var(--neutral-soft) 4px 5px)" }}>{naLabel}</td>;
+                  const a = ci === 0 ? 0.9 : 0.06 + 0.84 * Math.min(1, v / m);
+                  const on = hi && hi[0] === ri && hi[1] === ci;
+                  return <td key={ci} onMouseEnter={function () { setHi([ri, ci]); }} onMouseLeave={function () { setHi(null); }} onClick={onCellClick ? function () { onCellClick(r, ci, v); } : undefined}
+                    title={r.label + " · " + columns[ci] + ": " + f(v)}
+                    style={{ minWidth: 52, textAlign: "center", borderRadius: 4, cursor: onCellClick ? "pointer" : "default", background: "rgba(var(--heat-base)," + a.toFixed(3) + ")",
+                      color: a > 0.5 ? "var(--text-on-accent)" : "var(--text-primary)", fontWeight: a > 0.5 ? 600 : 400, outline: on ? "1.5px solid var(--text-primary)" : "none" }}>{f(v)}</td>;
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+function hs(a) { return { textAlign: a, padding: "0 10px 6px 0", font: "500 11px/1 var(--font-sans)", color: "var(--text-tertiary)", whiteSpace: "nowrap" }; }

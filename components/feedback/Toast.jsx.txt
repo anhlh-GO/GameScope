@@ -1,0 +1,19 @@
+import React from "react";
+import { Icon } from "../core/Icon.jsx";
+
+const T = { info: ["var(--info)", "info"], positive: ["var(--positive)", "circle-check"], warning: ["var(--warning)", "triangle-alert"], negative: ["var(--negative)", "octagon-alert"], demo: ["var(--accent)", "flask-conical"] };
+
+export function Toast({ tone = "info", title, description, onClose, style }) {
+  const t = T[tone] || T.info;
+  return (
+    <div role="status" style={{ display: "flex", gap: 10, alignItems: "flex-start", width: 340, maxWidth: "calc(100vw - 32px)", padding: "12px 12px 12px 14px",
+      borderRadius: "var(--radius-lg)", background: "var(--bg-tooltip)", boxShadow: "var(--shadow-md)", animation: "gp-fade-up var(--dur-base) var(--ease-out)", ...style }}>
+      <span style={{ color: t[0], display: "inline-flex", paddingTop: 1 }}><Icon name={t[1]} size={16} /></span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ font: "600 13px/1.4 var(--font-sans)", color: "var(--text-primary)" }}>{title}</div>
+        {description ? <div style={{ font: "400 12px/1.45 var(--font-sans)", color: "var(--text-tertiary)", marginTop: 2 }}>{description}</div> : null}
+      </div>
+      {onClose ? <button aria-label="Close" onClick={onClose} style={{ border: 0, background: "none", color: "var(--text-tertiary)", cursor: "pointer", padding: 2, display: "inline-flex" }}><Icon name="x" size={14} /></button> : null}
+    </div>
+  );
+}

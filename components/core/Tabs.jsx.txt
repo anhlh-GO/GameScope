@@ -1,0 +1,20 @@
+import React from "react";
+
+export function Tabs({ items = [], value, onChange, style }) {
+  return (
+    <div role="tablist" style={{ display: "flex", gap: 20, boxShadow: "inset 0 -1px 0 var(--border-subtle)", overflowX: "auto", overflowY: "hidden", ...style }}>
+      {items.map(function (it) {
+        const on = it.value === value;
+        return (
+          <button key={it.value} role="tab" aria-selected={on} disabled={it.disabled} onClick={function () { if (!it.disabled && onChange) onChange(it.value); }}
+            style={{ background: "none", border: 0, padding: "10px 0", display: "inline-flex", alignItems: "center", gap: 6,
+              borderBottom: "2px solid " + (on ? "var(--accent)" : "transparent"), color: on ? "var(--text-primary)" : "var(--text-tertiary)",
+              font: "500 13px/1 var(--font-sans)", cursor: it.disabled ? "not-allowed" : "pointer", opacity: it.disabled ? 0.5 : 1, whiteSpace: "nowrap" }}>
+            {it.label}
+            {it.count != null ? <span style={{ font: "500 11px/1 var(--font-mono)", padding: "3px 5px", borderRadius: 4, background: "var(--neutral-soft)", color: "var(--text-secondary)" }}>{it.count}</span> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}

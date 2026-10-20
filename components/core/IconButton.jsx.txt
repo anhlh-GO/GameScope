@@ -1,0 +1,19 @@
+import React from "react";
+import { Icon } from "./Icon.jsx";
+
+export function IconButton({ icon, label, size = "md", variant = "ghost", active = false, disabled = false, onClick, style }) {
+  const [hover, setHover] = React.useState(false);
+  const d = { sm: 28, md: 32, lg: 40 }[size] || 32;
+  const ic = { sm: 14, md: 16, lg: 18 }[size] || 16;
+  const bg = active ? "var(--bg-active)" : hover && !disabled ? "var(--bg-hover)" : variant === "secondary" ? "var(--bg-raised)" : "transparent";
+  return (
+    <button type="button" aria-label={label} title={label} disabled={disabled} onClick={disabled ? undefined : onClick}
+      onMouseEnter={function () { setHover(true); }} onMouseLeave={function () { setHover(false); }}
+      style={{ width: d, height: d, display: "inline-flex", alignItems: "center", justifyContent: "center", flex: "none", borderRadius: "var(--radius-md)",
+        border: variant === "secondary" ? "1px solid var(--border-default)" : "1px solid transparent", background: bg,
+        color: active || hover ? "var(--text-primary)" : "var(--text-secondary)", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1,
+        transition: "background var(--dur-fast), color var(--dur-fast)", padding: 0, ...style }}>
+      <Icon name={icon} size={ic} />
+    </button>
+  );
+}

@@ -1,0 +1,12 @@
+import React from "react";
+
+export function GameAvatar({ name = "", color = "var(--chart-1)", size = 24, src, style }) {
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w[0]; }).join("").toUpperCase();
+  const r = Math.round(size * 0.28);
+  if (src) return <img src={src} alt={name} width={size} height={size} style={{ borderRadius: r, objectFit: "cover", flex: "none", ...style }} />;
+  return (
+    <span aria-label={name} style={{ width: size, height: size, borderRadius: r, flex: "none", display: "inline-flex", alignItems: "center", justifyContent: "center",
+      background: color, color: "rgba(0,0,0,.72)", font: "700 " + Math.round(size * 0.4) + "px/1 var(--font-sans)", letterSpacing: "-0.02em",
+      boxShadow: "inset 0 0 0 1px rgba(255,255,255,.18)", ...style }}>{initials}</span>
+  );
+}

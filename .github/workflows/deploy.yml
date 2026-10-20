@@ -1,0 +1,37 @@
+# GamePulse → GitHub Pages
+# Cần 1 secret: Settings → Secrets and variables → Actions → New repository secret
+#   Name:  GP_PASSWORD_SHA256
+#   Value: mã SHA-256 của mật khẩu (tạo trong app: Settings → Security → Change password)
+name: Deploy GamePulse
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inject password hash
+        env:
+          HASH: ${{ secrets.GP_PASSWORD_SHA256 }}
+        run: |
+          if [ -z "$HASH" ]; then echo "::error::Secret GP_PASSWORD_SHA256 chưa được tạo"; exit 1; fi
+          sed -i -E "s/passwordSha256: \"[0-9a-f]*\"/passwordSha256: \"$HASH\"/" config.js
+          grep -q "$HASH" config.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,25 @@
+import React from "react";
+import { Icon } from "./Icon.jsx";
+
+const TONES = {
+  neutral: ["var(--neutral-soft)", "var(--text-secondary)"],
+  accent: ["var(--accent-soft)", "var(--accent-text)"],
+  positive: ["var(--positive-soft)", "var(--positive)"],
+  negative: ["var(--negative-soft)", "var(--negative)"],
+  warning: ["var(--warning-soft)", "var(--warning)"],
+  info: ["var(--info-soft)", "var(--info)"]
+};
+
+export function Badge({ tone = "neutral", variant = "soft", size = "md", dot = false, icon, children, title, style }) {
+  const t = TONES[tone] || TONES.neutral;
+  const h = size === "sm" ? 18 : 22;
+  return (
+    <span title={title} style={{ display: "inline-flex", alignItems: "center", gap: 5, height: h, padding: size === "sm" ? "0 6px" : "0 8px",
+      borderRadius: "var(--radius-sm)", font: "500 " + (size === "sm" ? 11 : 12) + "px/1 var(--font-sans)", whiteSpace: "nowrap",
+      background: variant === "outline" ? "transparent" : t[0], color: t[1], border: variant === "outline" ? "1px solid currentColor" : "1px solid transparent", ...style }}>
+      {dot ? <span style={{ width: 6, height: 6, borderRadius: 3, background: "currentColor" }}></span> : null}
+      {icon ? <Icon name={icon} size={size === "sm" ? 11 : 12} strokeWidth={2} /> : null}
+      {children}
+    </span>
+  );
+}
