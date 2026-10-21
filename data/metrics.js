@@ -163,7 +163,38 @@
   }
 
   /* ---------- levels (linear) ---------- */
+  /* live levels from GA4 events (start / victory / lose / quit per level). Players = sum of daily unique users,
+     so a player who replays a level on two days counts twice. Booster, time and ad metrics are not tracked. */
+  function liveLevels(F) {
+    const g = D.GAMES.find(function (x) { return x.id === F.game; });
+    const gi = D.GAMES.indexOf(g);
+    if (!g || !g.levels || !D.LEVELS[gi]) return null;
+    const R = ranges(F), A = {};
+    D.LEVELS[gi].forEach(function (x) {
+      if (x.di < R.from || x.di > R.to) return;
+      if (F.platform && F.platform !== "all" && D.PLATFORMS[x.pi].id !== F.platform) return;
+      const a = A[x.n] || (A[x.n] = {}); const t = a[x.t] || (a[x.t] = { c: 0, u: 0 }); t.c += x.c; t.u += x.u;
+    });
+    const z = { c: 0, u: 0 }, get = function (n, t) { return (A[n] && A[n][t]) || z; };
+    const hasLose = Object.keys(A).some(function (n) { return A[n].lose || A[n].fail; }), hasQuit = Object.keys(A).some(function (n) { return A[n].quit; });
+    const base = get(1, "start").u || 1, out = [];
+    for (let n = 1; n <= g.levels; n++) {
+      const st = get(n, "start"), win = get(n, "victory"), lose = get(n, "lose").c + get(n, "fail").c, quit = get(n, "quit").c;
+      if (!st.c && !win.c) continue;
+      const next = n < g.levels ? get(n + 1, "start").u : null;
+      out.push({ id: n, level: n, reach: st.u, reachRate: st.u / base, starts: st.c, wins: win.c,
+        fails: hasLose ? lose : Math.max(0, st.c - win.c - quit), exits: quit,
+        winRate: st.c ? Math.min(1, win.c / st.c) : null, completionRate: st.u ? Math.min(1, win.u / st.u) : null,
+        avgAttempts: st.u ? st.c / st.u : null, retryRate: st.c ? Math.max(0, st.c - st.u) / st.c : null,
+        drop: next == null || !win.u ? null : Math.max(0, Math.min(1, 1 - next / win.u)),
+        avgTime: null, boosters: 0, boosterRate: null, adImps: null, rev: null, exitRate: hasQuit && st.c ? quit / st.c : null,
+        small: st.u < 30 });
+    }
+    if (!out.length) return null;
+    return { game: g, players: get(1, "start").u, levels: out, hardShare: 0, live: true, failsAreUnwon: !hasLose };
+  }
   function levels(F) {
+    if (D.LEVELS) return liveLevels(F);
     const g = D.GAMES.find(function (x) { return x.id === F.game; });
     if (!g || g.nonlinear || !g.levels) return null;
     const R = ranges(F);
@@ -426,7 +457,8 @@
         if (rule.metric === "winrate") {
           if (g.nonlinear || !g.levels) return;
           const a = levels(Object.assign({}, F, { from: E - 6, to: E })), b = levels(Object.assign({}, F, { from: E - 6 - shift, to: E - shift }));
-          a.levels.forEach(function (lv, i) { const p = b.levels[i]; const ch = lv.winRate - p.winRate; if (lv.reach >= rule.minSample && -ch * 100 >= rule.threshold) out.push(mk(rule, g, "Level " + lv.level + " win rate", lv.winRate, p.winRate, ch, true, "levels", "Level " + lv.level)); });
+          if (!a || !b) return;
+          a.levels.forEach(function (lv) { const p = b.levels.find(function (x) { return x.level === lv.level; }); if (!p || lv.winRate == null || p.winRate == null) return; const ch = lv.winRate - p.winRate; if (lv.reach >= rule.minSample && -ch * 100 >= rule.threshold) out.push(mk(rule, g, "Level " + lv.level + " win rate", lv.winRate, p.winRate, ch, true, "levels", "Level " + lv.level)); });
           return;
         }
         const cur = metricWindow(F, rule.metric, E - 6, E), prev = metricWindow(F, rule.metric, E - 6 - shift, E - shift);

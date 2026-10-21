@@ -18,6 +18,8 @@ const Q = {
   /* classic retention: users first seen on first_session_date and active again on date */
   cohort: "date,first_session_date,account_id,platform,active_users"
 };
+/* server-side filters per query (Windsor 'filter' param) */
+const QF = {};
 const RET_DAYS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 30];
 const CORE = ["active_users", "newusers", "sessions", "engaged_sessions", "user_engagement_duration", "event_count"];
 const REV = ["purchase_revenue", "total_ad_revenue", "transactions", "total_purchasers", "first_time_purchasers", "publisher_ad_impressions"];
@@ -32,7 +34,7 @@ async function load(name) {
   if (dirArg > 0) return JSON.parse((await readFile(join(process.argv[dirArg + 1], name + ".json"), "utf8")).replace(/^﻿/, "")).data || [];
   const key = process.env.WINDSOR_API_KEY;
   if (!key) throw new Error("WINDSOR_API_KEY is not set");
-  const url = `${BASE}?api_key=${encodeURIComponent(key)}&date_from=${iso(from)}&date_to=${iso(today)}&fields=${Q[name]}`;
+  const url = `${BASE}?api_key=${encodeURIComponent(key)}&date_from=${iso(from)}&date_to=${iso(today)}&fields=${Q[name]}` + (QF[name] ? `&filter=${encodeURIComponent(JSON.stringify(QF[name]))}` : "");
   for (let attempt = 1; ; attempt++) {
     const res = await fetch(url, { signal: AbortSignal.timeout(300000) });
     const text = await res.text();
@@ -154,12 +156,38 @@ for (const s of SLICES) {
 }
 
 const round = round4;
+/* ---- levels: per-level events. Default naming (Falcon template): game_main_start_<n>, game_main_victory_<n>,
+   optional game_main_lose_<n> / _fail_ / _quit_ / _revive_. Override the prefix per game in data/games.json ("levelPrefix"). */
+const LEVEL_TYPES = ["start", "victory", "lose", "fail", "quit", "revive"];
+let levelRows = [];
+try {
+  const prefixes = [...new Set(["game_main_"].concat(Object.values(overrides).map((o) => o.levelPrefix).filter(Boolean)))];
+  Q.levels = "date,account_id,platform,event_name,event_count,users";
+  const lm = new Map();
+  for (const pre of prefixes) {
+    QF.levels = [["event_name", "contains", pre]];
+    if (!/^[A-Za-z0-9_]+$/.test(pre)) { console.log("::warning::Ignoring invalid levelPrefix " + JSON.stringify(pre)); continue; }
+    const re = new RegExp("^" + pre + "(" + LEVEL_TYPES.join("|") + ")_(\\d+)$");
+    for (const r of await load("levels")) {
+      const gi = gIndex.get(String(r.account_id)), d = di(r.date), pi = platformIdx(r.platform);
+      const o = overrides[String(r.account_id)] || {};
+      if (gi == null || pi < 0 || d < 0 || d >= DAYS || (o.levelPrefix || "game_main_") !== pre) continue;
+      const m = re.exec(String(r.event_name)); if (!m) continue;
+      const k = [gi, d, pi, +m[2], LEVEL_TYPES.indexOf(m[1])].join("|");
+      const v = lm.get(k) || [0, 0]; v[0] += num(r.event_count); v[1] += num(r.users); lm.set(k, v);
+    }
+  }
+  levelRows = [...lm.entries()].map(([k, v]) => k.split("|").map(Number).concat(v));
+  console.log(`levels: ${levelRows.length} rows`);
+} catch (e) { console.log("::warning::Levels not updated: " + e.message); }
+
 const out = {
   v: 1, source: "GA4 via Windsor.ai", updatedAt: Date.now(), from: iso(from), days: DAYS,
   games, countries, fields: CORE.concat(REV),
   rows: [...rows.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((r) => r.map(round)),
   stick: stickRows,
   ret: ret, /* [gameIdx, cohortDayIdx, platformIdx, nthDay, users] */
+  levels: { types: LEVEL_TYPES, rows: levelRows }, /* rows: [gi, di, pi, level, typeIdx, eventCount, users] */
   slices /* { name: { dims, vals[dim][], rows: [gi, di, pi, ...dimIdx, ...fields], ret: [gi, c, pi, ...dimIdx, n, users] } } */
 };
 if (!games.length) throw new Error("Windsor returned no GA4 properties — check the connector in Windsor.ai");

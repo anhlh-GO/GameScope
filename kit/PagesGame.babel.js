@@ -24,19 +24,28 @@ function LevelsPage() {
   const Lp = React.useMemo(function () { return g && !g.nonlinear && R.cFrom != null && R.cFrom >= 0 ? GP.levels(Object.assign({}, F, { from: R.cFrom, to: R.cTo })) : null; }, [key]);
   if (!g) return <div><PageHeader title="Level Analytics" desc={window.ROUTES[4].desc} /><NeedGame reason="Level structures differ per game, so levels are analysed one game at a time." /></div>;
   if (g.nonlinear) return <NonLinear key={g.id} F={F} g={g} loading={loading} k={key} />;
+  if (!L) return <div><PageHeader title={"Level Analytics · " + g.name} desc={window.ROUTES[4].desc} />
+    <Callout tone="info" title="Chưa có dữ liệu level cho game này trong khoảng thời gian đã chọn">
+      Trang này đọc các event GA4 dạng <code>game_main_start_N</code> và <code>game_main_victory_N</code> (tuỳ chọn <code>game_main_lose_N</code>, <code>game_main_quit_N</code>). Nếu game dùng tên event khác, thêm <code>"levelPrefix"</code> cho game đó trong <code>data/games.json</code>, hoặc chọn khoảng thời gian dài hơn.
+    </Callout></div>;
+  const LIVE = !!L.live;
   const T = levelTotals(L), Tp = levelTotals(Lp);
   const C = compareLabel(F);
-  const card = function (k, label, f, o) { o = o || {}; return <KpiCard loading={loading} label={label} value={f(T[k])} delta={Tp ? GP.delta(T[k], Tp[k], o.pp) : null} deltaFormat={o.pp ? "pp" : "percent"} goodDirection={o.good || "up"} compareLabel={C} info={o.info} source="Demo · events" />; };
-  const hardest = L.levels.slice().sort(function (a, b) { return a.winRate - b.winRate; })[0];
-  const hp = Lp ? Lp.levels[hardest.level - 1] : null;
-  const ms = [1, 5, 10, 15, 20, 25, 30, 35, 40].filter(function (n) { return n <= L.levels.length; }).map(function (n) { return { label: "Level " + n, value: L.levels[n - 1].reach }; });
+  const card = function (k, label, f, o) { o = o || {}; return <KpiCard loading={loading} label={label} value={f(T[k])} delta={Tp ? GP.delta(T[k], Tp[k], o.pp) : null} deltaFormat={o.pp ? "pp" : "percent"} goodDirection={o.good || "up"} compareLabel={C} info={o.info} source={LIVE ? "GA4 · level events" : "Demo · events"} />; };
+  /* ignore levels with tiny samples when naming the hardest one */
+  const hardest = L.levels.filter(function (l) { return !l.small && l.winRate != null; }).concat(L.levels).slice().sort(function (a, b) { return (a.small ? 1 : 0) - (b.small ? 1 : 0) || (a.winRate == null ? 2 : a.winRate) - (b.winRate == null ? 2 : b.winRate); })[0];
+  const byLevel = function (X, n) { return X ? X.levels.find(function (l) { return l.level === n; }) : null; };
+  const hp = byLevel(Lp, hardest.level);
+  const ms = [1, 5, 10, 15, 20, 25, 30, 35, 40].map(function (n) { return byLevel(L, n); }).filter(Boolean).map(function (l) { return { label: "Level " + l.level, value: l.reach }; });
+  if (LIVE && metric === "boosterRate") setMetric("winRate");
   const metricDef = { winRate: ["Win rate (per attempt)", P, "var(--accent)"], avgAttempts: ["Avg. attempts per player", function (v) { return fmt.num(v, 1); }, "var(--chart-2)"], drop: ["Drop-off (players who never start the next level)", P, "var(--negative)"], boosterRate: ["Booster usage (per attempt)", P, "var(--chart-3)"] }[metric];
   const cols = [
-    { key: "level", header: "Level", align: "left" }, { key: "reach", header: "Players reached", format: fmt.int }, { key: "starts", header: "Starts", format: fmt.int }, { key: "wins", header: "Wins", format: fmt.int }, { key: "fails", header: "Fails", format: fmt.int },
+    { key: "level", header: "Level", align: "left" }, { key: "reach", header: LIVE ? "Players (Σ daily users)" : "Players reached", format: fmt.int }, { key: "starts", header: "Starts", format: fmt.int }, { key: "wins", header: "Wins", format: fmt.int }, { key: "fails", header: LIVE && L.failsAreUnwon ? "Not won" : "Fails", format: fmt.int },
     { key: "winRate", header: "Win rate", render: function (r) { return <MiniBar value={r.winRate} label={P(r.winRate)} color={r.winRate < .3 ? "var(--negative)" : r.winRate > .9 ? "var(--info)" : "var(--accent)"} width={48} />; }, sortValue: function (r) { return r.winRate; } },
     { key: "avgAttempts", header: "Avg attempts", format: function (v) { return fmt.num(v, 1); } }, { key: "avgTime", header: "Avg time", format: fmt.dur },
     { key: "drop", header: "Drop-off", format: P, cellStyle: function (r) { return r.drop > .1 ? { color: "var(--negative)" } : null; } }, { key: "boosterRate", header: "Booster usage", format: P }
-  ];
+  ].filter(function (c) { return !LIVE || (c.key !== "avgTime" && c.key !== "boosterRate"); });
+  const hasExit = !LIVE || L.levels.some(function (l) { return l.exitRate != null; });
   return (
     <div>
       <PageHeader title={"Level Analytics · " + g.name} desc={window.ROUTES[4].desc}
@@ -46,29 +55,29 @@ function LevelsPage() {
         Drop-off {P(hardest.drop)} · {fmt.num(hardest.avgAttempts, 1)} attempts per player{hp ? " · win rate " + (hardest.winRate < hp.winRate ? "down " : "up ") + Math.abs((hardest.winRate - hp.winRate) * 100).toFixed(1) + " pp vs comparison" : ""}. Check recent level-config or version changes before concluding a cause.
       </Callout>
       <Grid min={180}>
-        {card("starts", "Level starts", fmt.int)}{card("wins", "Level completes", fmt.int)}{card("fails", "Level fails", fmt.int, { good: "down" })}
+        {card("starts", "Level starts", fmt.int)}{card("wins", "Level completes", fmt.int)}{card("fails", LIVE && L.failsAreUnwon ? "Starts not won" : "Level fails", fmt.int, { good: "down", info: LIVE && L.failsAreUnwon ? "Starts − wins. The game logs no lose event, so this includes quits and restarts." : undefined })}
         {card("winRate", "Win rate", P, { pp: true, info: "Σ wins ÷ Σ attempts (attempt-based)." })}{card("reach10", "Reach rate · L10", P, { pp: true, info: "Players reaching level 10 ÷ players starting level 1 (player-based)." })}
         {card("drop", "Avg. drop-off / level", P, { pp: true, good: "down", info: "Geometric mean of per-level drop-off across all levels." })}{card("retry", "Retry rate", P, { pp: true, good: "neutral", info: "Repeat attempts ÷ all attempts." })}
-        {card("attempts", "Avg. attempts", function (v) { return fmt.num(v, 2); }, { good: "neutral", info: "Σ attempts ÷ Σ unique players reaching each level." })}{card("time", "Avg. completion time", fmt.dur, { good: "neutral" })}
-        {card("booster", "Booster usage", P, { pp: true, good: "neutral", info: "Attempts with ≥1 booster ÷ attempts." })}{card("exit", "Level exit rate", P, { pp: true, good: "down", info: "Attempts abandoned mid-level ÷ attempts." })}
+        {card("attempts", "Avg. attempts", function (v) { return fmt.num(v, 2); }, { good: "neutral", info: "Σ attempts ÷ Σ unique players reaching each level." })}{LIVE ? null : card("time", "Avg. completion time", fmt.dur, { good: "neutral" })}
+        {LIVE ? null : card("booster", "Booster usage", P, { pp: true, good: "neutral", info: "Attempts with ≥1 booster ÷ attempts." })}{hasExit ? card("exit", "Level exit rate", P, { pp: true, good: "down", info: "Attempts abandoned mid-level ÷ attempts." }) : null}
       </Grid>
       <Section title="Progression">
         <Cols min={440}>
           <ChartCard loading={loading} title="Level completion funnel" subtitle="Unique players reaching each milestone"><FunnelChart steps={ms} /></ChartCard>
           <ChartCard loading={loading} title={metricDef[0]} subtitle="Click a bar for level detail"
-            actions={<SegmentedControl value={metric} onChange={setMetric} options={[{ value: "winRate", label: "Win rate" }, { value: "avgAttempts", label: "Attempts" }, { value: "drop", label: "Drop-off" }, { value: "boosterRate", label: "Boosters" }]} />}>
+            actions={<SegmentedControl value={metric} onChange={setMetric} options={[{ value: "winRate", label: "Win rate" }, { value: "avgAttempts", label: "Attempts" }, { value: "drop", label: "Drop-off" }].concat(LIVE ? [] : [{ value: "boosterRate", label: "Boosters" }])} />}>
             <BarChart data={L.levels} xKey="level" xFormat={function (v, t) { return t ? "Level " + v : v; }} yFormat={metricDef[1]} highlightKey={detail ? detail.level : undefined} onBarClick={setDetail} series={[{ key: metric, label: metricDef[0], color: metricDef[2] }]} />
           </ChartCard>
           <ChartCard loading={loading} title="Reach rate by level" subtitle="Share of starting players reaching each level">
             <LineChart data={L.levels} xKey="level" xFormat={function (v, t) { return t ? "Level " + v : v; }} yFormat={function (v) { return fmt.pct(v, 0); }} yMin={0} zoomable series={[{ key: "reachRate", label: "Reach rate", color: "var(--accent)", area: true }]} />
           </ChartCard>
-          <ChartCard loading={loading} title={"Completion time · Level " + (detail || hardest).level} subtitle="Distribution of winning attempts">
+          {LIVE ? null : <ChartCard loading={loading} title={"Completion time · Level " + (detail || hardest).level} subtitle="Distribution of winning attempts">
             <BarChart data={GP.levelTimeDist(detail || hardest)} xKey="x" yFormat={fmt.int} series={[{ key: "v", label: "Wins", color: "var(--chart-7)" }]} />
-          </ChartCard>
+          </ChartCard>}
         </Cols>
       </Section>
       <Section title="Level performance">
-        <Card><DataTable dense rowKey="level" rows={L.levels} columns={cols} pageSize={15} onRowClick={setDetail} footerNote="Rates in this table: win rate & booster usage per attempt; drop-off per unique player." /></Card>
+        <Card><DataTable dense rowKey="level" rows={L.levels} columns={cols} pageSize={15} onRowClick={setDetail} footerNote={LIVE ? "GA4 events game_main_start_N / game_main_victory_N. Win rate per attempt; drop-off = players who won the level but never started the next one. Players are summed daily unique users; levels with < 30 players are noisy." : "Rates in this table: win rate & booster usage per attempt; drop-off per unique player."} /></Card>
       </Section>
       <LevelDialog lv={detail} g={g} onClose={function () { setDetail(null); }} />
     </div>
@@ -76,14 +85,16 @@ function LevelsPage() {
 }
 function LevelDialog({ lv, g, onClose }) {
   if (!lv) return null;
-  const items = [["Total attempts", fmt.full(lv.starts)], ["Unique players", fmt.full(lv.reach)], ["Wins", fmt.full(lv.wins)], ["Fails", fmt.full(lv.fails)], ["Retries", fmt.full(lv.starts - lv.reach)], ["Avg. playtime / attempt", fmt.dur(lv.avgTime)], ["Booster uses", fmt.full(lv.boosters)], ["Ad impressions", fmt.full(lv.adImps)], ["Revenue (ads + boosters)", fmt.money(lv.rev, true)], ["Exit rate", P(lv.exitRate)]];
+  const live = lv.avgTime == null;
+  const items = [["Total attempts", fmt.full(lv.starts)], [live ? "Players (Σ daily)" : "Unique players", fmt.full(lv.reach)], ["Wins", fmt.full(lv.wins)], ["Fails", fmt.full(lv.fails)], ["Retries", fmt.full(Math.max(0, lv.starts - lv.reach))], ["Avg. playtime / attempt", fmt.dur(lv.avgTime)], ["Booster uses", fmt.full(lv.boosters)], ["Ad impressions", fmt.full(lv.adImps)], ["Revenue (ads + boosters)", fmt.money(lv.rev, true)], ["Exit rate", P(lv.exitRate)]]
+    .filter(function (it) { return !live || ["Avg. playtime / attempt", "Booster uses", "Ad impressions", "Revenue (ads + boosters)"].indexOf(it[0]) < 0 && !(it[0] === "Exit rate" && lv.exitRate == null); });
   return (
     <Dialog open onClose={onClose} width={620} title={g.name + " · Level " + lv.level} description="Attempt-based and player-based rates are shown separately.">
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 10 }}>
         {items.map(function (it) { return <div key={it[0]} style={{ padding: 12, borderRadius: 10, background: "var(--bg-sunken)" }}><div style={{ font: "var(--type-caption)", color: "var(--text-tertiary)" }}>{it[0]}</div><div style={{ font: "600 18px/1.3 var(--font-sans)", marginTop: 4, fontVariantNumeric: "tabular-nums" }}>{it[1]}</div></div>; })}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
-        <div style={{ padding: 12, borderRadius: 10, border: "1px solid var(--border-subtle)" }}><div style={{ font: "var(--type-label)", marginBottom: 8 }}>Per attempt</div><Row k="Win rate" v={P(lv.winRate)} /><Row k="Fail rate" v={P(lv.fails / lv.starts)} /><Row k="Booster usage" v={P(lv.boosterRate)} /><Row k="Exit rate" v={P(lv.exitRate)} /></div>
+        <div style={{ padding: 12, borderRadius: 10, border: "1px solid var(--border-subtle)" }}><div style={{ font: "var(--type-label)", marginBottom: 8 }}>Per attempt</div><Row k="Win rate" v={P(lv.winRate)} /><Row k="Fail rate" v={P(lv.fails / lv.starts)} />{live ? null : <Row k="Booster usage" v={P(lv.boosterRate)} />}{lv.exitRate == null ? null : <Row k="Exit rate" v={P(lv.exitRate)} />}</div>
         <div style={{ padding: 12, borderRadius: 10, border: "1px solid var(--border-subtle)" }}><div style={{ font: "var(--type-label)", marginBottom: 8 }}>Per unique player</div><Row k="Completion rate" v={P(lv.completionRate)} /><Row k="Avg. attempts" v={fmt.num(lv.avgAttempts, 2)} /><Row k="Drop-off" v={P(lv.drop)} /><Row k="Reach rate" v={P(lv.reachRate)} /></div>
       </div>
     </Dialog>

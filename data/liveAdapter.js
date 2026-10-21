@@ -86,7 +86,17 @@
     SLICES[name] = { dims: S.dims, vals: S.vals, usage: usage, ROWS: rows, retention: (S.ret || []).length > 0 };
   });
 
+  /* levels: per game → rows { di, pi, n (level), t (type), c (event count), u (users that day) } */
+  const LEVELS = GAMES.map(function () { return []; });
+  const LT = (L.levels && L.levels.types) || [];
+  ((L.levels && L.levels.rows) || []).forEach(function (r) {
+    if (r[1] >= N || !LEVELS[r[0]]) return;
+    LEVELS[r[0]].push({ di: r[1], pi: r[2], n: r[3], t: LT[r[4]], c: r[5], u: r[6] });
+  });
+  LEVELS.forEach(function (rows, gi) { let mx = 0; rows.forEach(function (x) { if (x.t === "start" && x.n > mx) mx = x.n; }); GAMES[gi].levels = mx; });
+
   Object.assign(D, {
+    LEVELS: LEVELS,
     END: dates[N - 1], N: N, dates: dates, COUNTRIES: COUNTRIES, GAMES: GAMES, ROWS: ROWS,
     CAMPAIGNS: GAMES.map(function () { return []; }), EXPERIMENTS: [], UPDATED_AT: L.updatedAt,
     SLICES: SLICES, LIVE: { source: L.source, updatedAt: L.updatedAt, retention: hasRet }
