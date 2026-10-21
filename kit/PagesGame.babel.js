@@ -62,8 +62,10 @@ function LevelsPage() {
         {LIVE ? null : card("booster", "Booster usage", P, { pp: true, good: "neutral", info: "Attempts with ≥1 booster ÷ attempts." })}{hasExit ? card("exit", "Level exit rate", P, { pp: true, good: "down", info: "Attempts abandoned mid-level ÷ attempts." }) : null}
       </Grid>
       <Section title="Progression">
+        <ChartCard loading={loading} title="Level funnel" subtitle="Kéo thanh trượt để chọn khoảng level · bấm một dòng để xem chi tiết level" style={{ marginBottom: 12 }}>
+          <LevelFunnel L={L} onPick={setDetail} highlight={detail ? detail.level : null} />
+        </ChartCard>
         <Cols min={440}>
-          <ChartCard loading={loading} title="Level completion funnel" subtitle="Unique players reaching each milestone"><FunnelChart steps={ms} /></ChartCard>
           <ChartCard loading={loading} title={metricDef[0]} subtitle="Click a bar for level detail"
             actions={<SegmentedControl value={metric} onChange={setMetric} options={[{ value: "winRate", label: "Win rate" }, { value: "avgAttempts", label: "Attempts" }, { value: "drop", label: "Drop-off" }].concat(LIVE ? [] : [{ value: "boosterRate", label: "Boosters" }])} />}>
             <BarChart data={L.levels} xKey="level" xFormat={function (v, t) { return t ? "Level " + v : v; }} yFormat={metricDef[1]} highlightKey={detail ? detail.level : undefined} onBarClick={setDetail} series={[{ key: metric, label: metricDef[0], color: metricDef[2] }]} />
@@ -83,6 +85,83 @@ function LevelsPage() {
     </div>
   );
 }
+/* Level funnel with mode (start / completion / both), a from–to level range and a step size. Rows are clickable. */
+const FUNNEL_MODES = [{ value: "start", label: "Level start" }, { value: "complete", label: "Level completion" }, { value: "both", label: "Start & completion" }];
+function LevelFunnel({ L, onPick, highlight }) {
+  const levels = L.levels;
+  const maxN = levels[levels.length - 1].level, minN = levels[0].level;
+  const [mode, setMode] = React.useState(function () { try { return localStorage.getItem("gp.lvFunnel.mode") || "both"; } catch (e) { return "both"; } });
+  const [range, setRange] = React.useState([minN, maxN]);
+  const [step, setStep] = React.useState(maxN - minN + 1 > 40 ? 5 : 1);
+  React.useEffect(function () { setRange([minN, maxN]); }, [L.game.id, minN, maxN]);
+  React.useEffect(function () { try { localStorage.setItem("gp.lvFunnel.mode", mode); } catch (e) {} }, [mode]);
+  const lo = Math.max(minN, Math.min(range[0], maxN)), hi = Math.max(lo, Math.min(range[1], maxN));
+  /* completion = players who won the level; demo data has no winner count, so derive it from completion rate */
+  const won = function (l) { return l.winUsers != null ? l.winUsers : l.reach * (l.completionRate || 0); };
+  const rows = levels.filter(function (l) { return l.level >= lo && l.level <= hi && ((l.level - lo) % step === 0 || l.level === hi); });
+  const first = rows.length ? (mode === "complete" ? won(rows[0]) : rows[0].reach) || 1 : 1;
+  const P1 = function (v) { return (v * 100).toFixed(1) + "%"; };
+  const grid = "minmax(64px,84px) minmax(0,1fr) 58px 64px" + (mode === "both" ? " 70px" : "");
+  const bar = function (v, color, label, tall) {
+    const share = Math.min(1, v / first);
+    return (
+      <span style={{ height: tall ? 22 : 13, borderRadius: 4, background: "var(--neutral-soft)", position: "relative", overflow: "hidden", display: "block" }}>
+        <span style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: (share * 100) + "%", background: color, borderRadius: 4, transition: "width var(--dur-slow) var(--ease-out)" }}></span>
+        <span style={{ position: "absolute", left: 8, top: 0, bottom: 0, display: "flex", alignItems: "center", font: (tall ? "500 11.5px/1" : "500 10px/1") + " var(--font-sans)", color: share > .2 ? "var(--text-on-accent)" : "var(--text-primary)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmt.int(v)}{label ? " · " + label : ""}</span>
+      </span>
+    );
+  };
+  const setLo = function (v) { v = +v; setRange([Math.min(v, hi), hi]); };
+  const setHi = function (v) { v = +v; setRange([lo, Math.max(v, lo)]); };
+  const slider = { width: "100%", accentColor: "var(--accent)", cursor: "pointer" };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, minWidth: 0 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+        <SegmentedControl value={mode} onChange={setMode} options={FUNNEL_MODES} />
+        <span style={{ flex: 1 }}></span>
+        <SegmentedControl value={String(step)} onChange={function (v) { setStep(+v); }} options={[{ value: "1", label: "Từng level" }, { value: "5", label: "Mỗi 5" }, { value: "10", label: "Mỗi 10" }]} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "auto minmax(0,1fr) auto minmax(0,1fr) auto", gap: 10, alignItems: "center", font: "var(--type-caption)", color: "var(--text-tertiary)" }}>
+        <span>Từ level <b style={{ color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{lo}</b></span>
+        <input type="range" min={minN} max={maxN} value={lo} onChange={function (e) { setLo(e.target.value); }} style={slider} aria-label="Từ level" />
+        <span>đến <b style={{ color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{hi}</b></span>
+        <input type="range" min={minN} max={maxN} value={hi} onChange={function (e) { setHi(e.target.value); }} style={slider} aria-label="Đến level" />
+        <Button size="sm" variant="ghost" iconLeft="rotate-ccw" onClick={function () { setRange([minN, maxN]); }}>Tất cả</Button>
+      </div>
+      {mode === "both" ? <div style={{ display: "flex", gap: 14, font: "var(--type-caption)", color: "var(--text-tertiary)" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--accent)" }}></span>Bắt đầu</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--chart-6)" }}></span>Hoàn thành</span>
+      </div> : null}
+      <div style={{ maxHeight: 460, overflowY: "auto", paddingRight: 4, display: "flex", flexDirection: "column", gap: mode === "both" ? 8 : 6 }}>
+        {rows.map(function (l, i) {
+          const v = mode === "complete" ? won(l) : l.reach;
+          const prev = i > 0 ? (mode === "complete" ? won(rows[i - 1]) : rows[i - 1].reach) : null;
+          const conv = prev ? v / prev : null;
+          const inLevel = l.reach ? won(l) / l.reach : null;
+          return (
+            <div key={l.level} onClick={function () { onPick(l); }} title={"Level " + l.level + " — bấm để xem chi tiết"}
+              style={{ display: "grid", gridTemplateColumns: grid, gap: 10, alignItems: "center", cursor: "pointer", padding: "2px 4px", borderRadius: 6, background: highlight === l.level ? "var(--bg-active)" : "transparent", opacity: l.small ? .6 : 1 }}>
+              <span style={{ font: "400 12px/1.25 var(--font-sans)", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>Level {l.level}{l.small ? " *" : ""}</span>
+              {mode === "both"
+                ? <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>{bar(l.reach, "var(--accent)")}{bar(won(l), "var(--chart-6)")}</span>
+                : bar(v, mode === "complete" ? "var(--chart-6)" : "var(--accent)", null, true)}
+              <span style={{ font: "500 12px/1 var(--font-sans)", textAlign: "right", color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{P1(v / first)}</span>
+              <span style={{ font: "400 11.5px/1 var(--font-sans)", textAlign: "right", color: conv != null && conv < .8 ? "var(--negative)" : conv != null && conv > 1 ? "var(--info)" : "var(--text-tertiary)", fontVariantNumeric: "tabular-nums" }}>
+                {conv == null ? "" : conv > 1 ? "+" + ((conv - 1) * 100).toFixed(1) + "%" : "−" + ((1 - conv) * 100).toFixed(1) + "%"}
+              </span>
+              {mode === "both" ? <span style={{ font: "400 11.5px/1 var(--font-sans)", textAlign: "right", color: inLevel != null && inLevel < .6 ? "var(--negative)" : "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>{inLevel == null ? "—" : P1(inLevel)}</span> : null}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: grid, gap: 10, font: "400 10.5px/1.3 var(--font-sans)", color: "var(--text-tertiary)" }}>
+        <span></span><span>{rows.some(function (l) { return l.small; }) ? "* dưới 30 người chơi — số dễ dao động" : ""}</span>
+        <span style={{ textAlign: "right", whiteSpace: "nowrap" }}>so với đầu</span><span style={{ textAlign: "right", whiteSpace: "nowrap" }} title="So với dòng phía trên">so với trên</span>{mode === "both" ? <span style={{ textAlign: "right", whiteSpace: "nowrap" }} title="Người hoàn thành ÷ người bắt đầu level">tỉ lệ HT</span> : null}
+      </div>
+    </div>
+  );
+}
+
 function LevelDialog({ lv, g, onClose }) {
   if (!lv) return null;
   const live = lv.avgTime == null;

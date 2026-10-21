@@ -182,7 +182,7 @@
       const st = get(n, "start"), win = get(n, "victory"), lose = get(n, "lose").c + get(n, "fail").c, quit = get(n, "quit").c;
       if (!st.c && !win.c) continue;
       const next = n < g.levels ? get(n + 1, "start").u : null;
-      out.push({ id: n, level: n, reach: st.u, reachRate: st.u / base, starts: st.c, wins: win.c,
+      out.push({ id: n, level: n, reach: st.u, reachRate: st.u / base, starts: st.c, wins: win.c, winUsers: win.u,
         fails: hasLose ? lose : Math.max(0, st.c - win.c - quit), exits: quit,
         winRate: st.c ? Math.min(1, win.c / st.c) : null, completionRate: st.u ? Math.min(1, win.u / st.u) : null,
         avgAttempts: st.u ? st.c / st.u : null, retryRate: st.c ? Math.max(0, st.c - st.u) / st.c : null,
