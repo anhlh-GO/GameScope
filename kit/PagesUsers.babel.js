@@ -134,7 +134,7 @@ function RetentionPage() {
       </Callout>
       <Grid min={180}>
         {card(1, "D1 retention")}{card(3, "D3 retention")}{card(7, "D7 retention")}{card(14, "D14 retention")}{card(30, "D30 retention")}
-        <KpiCard loading={loading} label="Rolling D7" value={P(R.rolling[7])} delta={R.prev ? R.rolling[7] - rollingOf(R.prev)[7] : null} deltaFormat="pp" compareLabel={C} info="Users active at least once in days 1–7 ÷ cohort size." source={D.LIVE ? (D.LIVE.retention ? "GA4 · cohorts" : "Not connected") : "Demo · cohorts"} />
+        <KpiCard loading={loading} label="Rolling D7" value={P(R.rolling[7])} delta={R.prev && R.rolling[7] != null ? R.rolling[7] - rollingOf(R.prev)[7] : null} deltaFormat="pp" compareLabel={C} info="Users active at least once in days 1–7 ÷ cohort size." source={D.LIVE ? (D.LIVE.retention ? "GA4 · cohorts" : "Not connected") : "Demo · cohorts"} />
         <KpiCard loading={loading} compareLabel={C} {...kpi(S, "returning", "Returning users", fmt.int, { color: "var(--chart-7)", info: "Daily average of active users who installed before that day." })} />
         <KpiCard loading={loading} label="D7 churn rate" value={P(R.unbounded[7] == null ? null : 1 - R.unbounded[7])} delta={R.prev && R.unbounded[7] != null ? (1 - R.unbounded[7]) - (1 - unbOf(R.prev)[7]) : null} deltaFormat="pp" goodDirection="down" compareLabel={C} info="Share of the cohort never seen on day 7 or later (1 − unbounded D7)." source={D.LIVE ? (D.LIVE.retention ? "GA4 · cohorts" : "Not connected") : "Demo · cohorts"} />
       </Grid>

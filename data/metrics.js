@@ -102,8 +102,10 @@
     RN.forEach(function (n) { let num = 0, den = 0, tot = 0; groups.forEach(function (g) { tot += g.size; if (g.base[n]) { num += g.n[n]; den += g.base[n]; } }); res[n] = den ? num / den : null; cov[n] = tot ? den / tot : 0; });
     res[0] = 1; return { r: res, coverage: cov };
   }
-  function rolling(classic) { const out = { 0: 1 }; const d1 = classic[1]; RN.forEach(function (n) { const c = classic[n]; if (c == null) { out[n] = null; return; } out[n] = Math.min(.97, d1 + (1 - d1) * .3 * (1 - Math.exp(-(n - 1) / 4))); }); return out; }
-  function unbounded(classic) { const out = { 0: 1 }; RN.forEach(function (n) { const c = classic[n]; out[n] = c == null ? null : Math.min(.95, c * (1.48 + .018 * Math.min(n, 14))); }); return out; }
+  /* rolling / unbounded are modeled from classic counts; real data has no such series, so report N/A */
+  function rolling(classic) { if (D.LIVE) return nulls(); const out = { 0: 1 }; const d1 = classic[1]; RN.forEach(function (n) { const c = classic[n]; if (c == null) { out[n] = null; return; } out[n] = Math.min(.97, d1 + (1 - d1) * .3 * (1 - Math.exp(-(n - 1) / 4))); }); return out; }
+  function nulls() { const out = { 0: 1 }; RN.forEach(function (n) { out[n] = null; }); return out; }
+  function unbounded(classic) { if (D.LIVE) return nulls(); const out = { 0: 1 }; RN.forEach(function (n) { const c = classic[n]; out[n] = c == null ? null : Math.min(.95, c * (1.48 + .018 * Math.min(n, 14))); }); return out; }
   function retention(F) {
     const R = ranges(F);
     const byDay = cohortRows(F, R.from, R.to);
