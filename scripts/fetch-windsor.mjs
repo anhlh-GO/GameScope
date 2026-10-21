@@ -103,6 +103,10 @@ for (const r of cohort) {
   const k = gi + "|" + c + "|" + pi + "|" + n;
   retMap.set(k, (retMap.get(k) || 0) + num(r.active_users));
 }
+if (cohort.length && !retMap.size) {
+  const r0 = cohort[0];
+  console.log(`::warning::Retention rows could not be mapped (${cohort.length} rows). Fields: ${Object.keys(r0).join(",")}; first_session_date sample: ${JSON.stringify(r0.first_session_date)}; date sample: ${JSON.stringify(r0.date)}; platform sample: ${JSON.stringify(r0.platform)}`);
+} else console.log(`cohort rows: ${cohort.length}`);
 const ret = [...retMap.entries()].map(([k, v]) => k.split("|").map(Number).concat(v));
 
 const round = (v) => Math.round(v * 10000) / 10000;
