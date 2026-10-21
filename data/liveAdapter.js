@@ -32,6 +32,12 @@
   const dauByGD = {};
   L.rows.forEach(function (r) { const k = r[0] + "|" + r[1]; dauByGD[k] = (dauByGD[k] || 0) + r[4]; });
 
+  /* retention: per game × cohort day × platform → { n: users active on day n }. GA4 cohorts come without a
+     country split, so each country row gets its platform's rate (country filters show the platform average). */
+  const RET = {};
+  (L.ret || []).forEach(function (t) { const k = t[0] + "|" + t[1] + "|" + t[2]; (RET[k] = RET[k] || {})[t[3]] = t[4]; });
+  const hasRet = Object.keys(RET).length > 0;
+
   const F = {}; L.fields.forEach(function (f, i) { F[f] = 4 + i; });
   const ROWS = GAMES.map(function () { return []; });
   L.rows.forEach(function (r) {
@@ -45,15 +51,19 @@
       req: 0, loaded: 0, rewOffers: 0, rewStarts: 0,
       payers: v("total_purchasers"), iapG: v("purchase_revenue"), iapRef: 0, purch: v("transactions"), firstPurch: v("first_time_purchasers"), subRev: 0,
       orgI: 0, paidI: 0, spend: 0,
-      wau: s ? s[2] * share : 0, mau: s ? s[3] * share : 0, crashUsers: s ? s[4] * share : 0, d1r: 0, noRet: true };
-    for (let n = 1; n <= 14; n++) row["r" + n] = 0;
-    row.r30 = 0;
+      wau: s ? s[2] * share : 0, mau: s ? s[3] * share : 0, crashUsers: s ? s[4] * share : 0, d1r: 0 };
+    const c = RET[r[0] + "|" + r[1] + "|" + r[2]], size = c && c[0];
+    const rate = function (n) { return size && c[n] ? Math.min(1, c[n] / size) : 0; };
+    for (let n = 1; n <= 14; n++) row["r" + n] = row.nu * rate(n);
+    row.r30 = row.nu * rate(30);
+    row.d1r = rate(1);
+    row.noRet = !size; /* no cohort for this day/platform: leave it out instead of counting 0% */
     ROWS[r[0]].push(row);
   });
 
   Object.assign(D, {
     END: dates[N - 1], N: N, dates: dates, COUNTRIES: COUNTRIES, GAMES: GAMES, ROWS: ROWS,
     CAMPAIGNS: GAMES.map(function () { return []; }), EXPERIMENTS: [], UPDATED_AT: L.updatedAt,
-    LIVE: { source: L.source, updatedAt: L.updatedAt }
+    LIVE: { source: L.source, updatedAt: L.updatedAt, retention: hasRet }
   });
 })();

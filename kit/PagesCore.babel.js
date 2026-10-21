@@ -174,7 +174,7 @@ function OverviewPage() {
           const v = val(m), p = pval(m);
           const mature = m.ret ? Rt.coverage[m.ret] : 1;
           return <KpiCard key={m.key} loading={loading} label={m.label} value={UNITS[m.unit](v)} delta={p == null ? null : GP.delta(v, p, m.pp)} deltaFormat={m.pp ? "pp" : "percent"} compareLabel={C}
-            spark={data.map(function (d) { return d[m.key]; })} color={m.color} info={m.info} source={m.ret ? (D.LIVE ? "Not connected" : "Demo · cohorts") : (D.LIVE ? "GA4 · Windsor" : "Demo data")} updated={fmt.day(F.to)}
+            spark={data.map(function (d) { return d[m.key]; })} color={m.color} info={m.info} source={m.ret ? (D.LIVE ? (D.LIVE.retention ? "GA4 · cohorts" : "Not connected") : "Demo · cohorts") : (D.LIVE ? "GA4 · Windsor" : "Demo data")} updated={fmt.day(F.to)}
             active={sel.indexOf(m.key) >= 0} onClick={function () { toggle(m); }} note={m.ret && mature < 1 && mature > 0 ? <Tooltip content={Math.round(mature * 100) + "% of cohort users in range are old enough for D" + m.ret + "."}><Badge size="sm" tone="warning">{Math.round(mature * 100)}%</Badge></Tooltip> : null} />;
         })}
       </Grid>

@@ -122,7 +122,7 @@ function RetentionPage() {
     return <KpiCard loading={loading} label={label} value={v == null ? "N/A" : P(v)} delta={v != null && p != null ? v - p : null} deltaFormat="pp" compareLabel={v == null ? "no mature cohorts" : C}
       info={(extra || "") + " Cohort-size weighted across install dates in range; only cohorts at least " + n + " day" + (n > 1 ? "s" : "") + " old are included."}
       note={v == null ? <Badge size="sm" tone="warning">Immature</Badge> : cov < .999 ? <Tooltip content={Math.round(cov * 100) + "% of users in range belong to cohorts mature for D" + n + "."}><Badge size="sm" tone="warning">{Math.round(cov * 100)}% mature</Badge></Tooltip> : null}
-      spark={R.cohorts.map(function (c) { return c.base[n] ? tf({ 1: c.n[1] / c.base[1], [n]: c.n[n] / c.base[n] })[n] : null; })} color="var(--accent)" source={D.LIVE ? "Not connected" : "Demo · cohorts"} />;
+      spark={R.cohorts.map(function (c) { return c.base[n] ? tf({ 1: c.n[1] / c.base[1], [n]: c.n[n] / c.base[n] })[n] : null; })} color="var(--accent)" source={D.LIVE ? (D.LIVE.retention ? "GA4 · cohorts" : "Not connected") : "Demo · cohorts"} />;
   };
   const modeName = { classic: "Classic", rolling: "Rolling", unbounded: "Unbounded" }[mode];
   return (
@@ -134,9 +134,9 @@ function RetentionPage() {
       </Callout>
       <Grid min={180}>
         {card(1, "D1 retention")}{card(3, "D3 retention")}{card(7, "D7 retention")}{card(14, "D14 retention")}{card(30, "D30 retention")}
-        <KpiCard loading={loading} label="Rolling D7" value={P(R.rolling[7])} delta={R.prev ? R.rolling[7] - rollingOf(R.prev)[7] : null} deltaFormat="pp" compareLabel={C} info="Users active at least once in days 1–7 ÷ cohort size." source={D.LIVE ? "Not connected" : "Demo · cohorts"} />
+        <KpiCard loading={loading} label="Rolling D7" value={P(R.rolling[7])} delta={R.prev ? R.rolling[7] - rollingOf(R.prev)[7] : null} deltaFormat="pp" compareLabel={C} info="Users active at least once in days 1–7 ÷ cohort size." source={D.LIVE ? (D.LIVE.retention ? "GA4 · cohorts" : "Not connected") : "Demo · cohorts"} />
         <KpiCard loading={loading} compareLabel={C} {...kpi(S, "returning", "Returning users", fmt.int, { color: "var(--chart-7)", info: "Daily average of active users who installed before that day." })} />
-        <KpiCard loading={loading} label="D7 churn rate" value={P(R.unbounded[7] == null ? null : 1 - R.unbounded[7])} delta={R.prev && R.unbounded[7] != null ? (1 - R.unbounded[7]) - (1 - unbOf(R.prev)[7]) : null} deltaFormat="pp" goodDirection="down" compareLabel={C} info="Share of the cohort never seen on day 7 or later (1 − unbounded D7)." source={D.LIVE ? "Not connected" : "Demo · cohorts"} />
+        <KpiCard loading={loading} label="D7 churn rate" value={P(R.unbounded[7] == null ? null : 1 - R.unbounded[7])} delta={R.prev && R.unbounded[7] != null ? (1 - R.unbounded[7]) - (1 - unbOf(R.prev)[7]) : null} deltaFormat="pp" goodDirection="down" compareLabel={C} info="Share of the cohort never seen on day 7 or later (1 − unbounded D7)." source={D.LIVE ? (D.LIVE.retention ? "GA4 · cohorts" : "Not connected") : "Demo · cohorts"} />
       </Grid>
       <Section title="Cohorts" aside={<SegmentedControl value={grain} onChange={setGrain} options={[{ value: "day", label: "Daily" }, { value: "week", label: "Weekly" }]} />}>
         <ChartCard loading={loading} height={320} title={modeName + " retention by install " + (grain === "day" ? "date" : "week")} subtitle="D0–D14 daily, plus D30. Hatched N/A = cohort not old enough to observe that day."
