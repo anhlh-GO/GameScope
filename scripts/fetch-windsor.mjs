@@ -93,7 +93,7 @@ for (const r of stick) {
   stickRows.push([gi, d, num(r.active7_day_users), num(r.active28_day_users), num(r.crash_affected_users)]);
 }
 
-const fsd = (s) => { const t = String(s || ""); return /^d{8}$/.test(t) ? t.slice(0, 4) + "-" + t.slice(4, 6) + "-" + t.slice(6) : t.slice(0, 10); };
+const fsd = (s) => { const t = String(s || ""); return /^\d{8}$/.test(t) ? t.slice(0, 4) + "-" + t.slice(4, 6) + "-" + t.slice(6) : t.slice(0, 10); };
 const retMap = new Map();
 for (const r of cohort) {
   const gi = gIndex.get(String(r.account_id)), pi = platformIdx(r.platform), c = di(fsd(r.first_session_date)), d = di(r.date);
