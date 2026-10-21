@@ -165,7 +165,7 @@ function kpi(S, key, label, f, o) {
   o = o || {};
   const v = S.k[key], p = S.pk ? S.pk[key] : null;
   return { label: label, value: f(v), delta: S.pk ? GP.delta(v, p, o.pp) : null, deltaFormat: o.pp ? "pp" : "percent", goodDirection: o.good || "up",
-    spark: o.noSpark ? null : S.series.map(function (d) { return d[o.sparkKey || key]; }), color: o.color || "var(--accent)", info: o.info, source: o.source || "Demo data", updated: o.updated };
+    spark: o.noSpark ? null : S.series.map(function (d) { return d[o.sparkKey || key]; }), color: o.color || "var(--accent)", info: o.info, source: o.source || (window.GP_DATA.LIVE ? "GA4 · Windsor" : "Demo data"), updated: o.updated };
 }
 function gameById(id) { return D.GAMES.find(function (g) { return g.id === id; }); }
 

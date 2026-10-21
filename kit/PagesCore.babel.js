@@ -57,9 +57,9 @@ function PortfolioPage() {
         <KpiCard loading={loading} compareLabel={C} {...kpi(S, "iap", "IAP revenue", fmt.money, { color: "var(--metric-iap)", info: "Gross store revenue." })} />
         <KpiCard loading={loading} compareLabel={C} {...kpi(S, "sessions", "Total sessions", fmt.int)} />
         <KpiCard loading={loading} compareLabel={C} {...kpi(S, "arpdau", "Avg. ARPDAU", function (v) { return fmt.money(v); }, { color: "var(--metric-total)", info: "Σ revenue ÷ Σ DAU-days across games. Recomputed from totals, never an average of per-game ARPDAU." })} />
-        <KpiCard loading={loading} label="Revenue growth" value={growth == null ? "—" : (growth > 0 ? "+" : "") + (growth * 100).toFixed(1) + "%"} delta={null} compareLabel={C} info="Change in portfolio total revenue vs the comparison period." source="Demo data" />
-        <KpiCard loading={loading} label="UA spend" value={fmt.money(UA.spend)} compareLabel="selected period" info="Paid media cost from attribution (AppsFlyer / Adjust)." source="Demo · attribution" spark={S.series.map(function (d) { return d.spend; })} color="var(--chart-8)" />
-        <KpiCard loading={loading} label="Portfolio D7 ROAS" value={UA.roas[7] == null ? "—" : fmt.pct(UA.roas[7], 0)} compareLabel={UA.maturity[7] < 1 ? Math.round(UA.maturity[7] * 100) + "% of spend mature" : "all cohorts mature"} info="Σ D7 cohort revenue ÷ Σ spend of the same install cohorts. Cohorts younger than 7 days are excluded." source="Demo · attribution" note={UA.maturity[7] < 1 ? <Badge size="sm" tone="warning">Partial</Badge> : null} />
+        <KpiCard loading={loading} label="Revenue growth" value={growth == null ? "—" : (growth > 0 ? "+" : "") + (growth * 100).toFixed(1) + "%"} delta={null} compareLabel={C} info="Change in portfolio total revenue vs the comparison period." source={D.LIVE ? "GA4 · Windsor" : "Demo data"} />
+        <KpiCard loading={loading} label="UA spend" value={fmt.money(UA.spend)} compareLabel="selected period" info="Paid media cost from attribution (AppsFlyer / Adjust)." source={D.LIVE ? "Not connected" : "Demo · attribution"} spark={S.series.map(function (d) { return d.spend; })} color="var(--chart-8)" />
+        <KpiCard loading={loading} label="Portfolio D7 ROAS" value={UA.roas[7] == null ? "—" : fmt.pct(UA.roas[7], 0)} compareLabel={UA.maturity[7] < 1 ? Math.round(UA.maturity[7] * 100) + "% of spend mature" : "all cohorts mature"} info="Σ D7 cohort revenue ÷ Σ spend of the same install cohorts. Cohorts younger than 7 days are excluded." source={D.LIVE ? "Not connected" : "Demo · attribution"} note={UA.maturity[7] < 1 ? <Badge size="sm" tone="warning">Partial</Badge> : null} />
       </Grid>
       <Section title="Games">
         <Card padding={16}>
@@ -174,7 +174,7 @@ function OverviewPage() {
           const v = val(m), p = pval(m);
           const mature = m.ret ? Rt.coverage[m.ret] : 1;
           return <KpiCard key={m.key} loading={loading} label={m.label} value={UNITS[m.unit](v)} delta={p == null ? null : GP.delta(v, p, m.pp)} deltaFormat={m.pp ? "pp" : "percent"} compareLabel={C}
-            spark={data.map(function (d) { return d[m.key]; })} color={m.color} info={m.info} source={m.ret ? "Demo · cohorts" : "Demo data"} updated={fmt.day(F.to)}
+            spark={data.map(function (d) { return d[m.key]; })} color={m.color} info={m.info} source={m.ret ? (D.LIVE ? "Not connected" : "Demo · cohorts") : (D.LIVE ? "GA4 · Windsor" : "Demo data")} updated={fmt.day(F.to)}
             active={sel.indexOf(m.key) >= 0} onClick={function () { toggle(m); }} note={m.ret && mature < 1 && mature > 0 ? <Tooltip content={Math.round(mature * 100) + "% of cohort users in range are old enough for D" + m.ret + "."}><Badge size="sm" tone="warning">{Math.round(mature * 100)}%</Badge></Tooltip> : null} />;
         })}
       </Grid>

@@ -89,6 +89,7 @@
   function cohortRows(F, from, to, keyFn) {
     const out = {};
     scan(F, from, to, function (r) {
+      if (r.noRet) return; /* live rows without cohort data: show "—" rather than 0% */
       const k = keyFn ? keyFn(r) : r.di;
       const o = out[k] || (out[k] = { key: k, size: 0, n: {}, base: {}, di: r.di });
       o.size += r.nu;
@@ -390,7 +391,7 @@
         const F = { game: g.id, platform: rule.platform, countries: rule.country === "all" ? [] : [rule.country] };
         const shift = rule.compare === "prev28" ? 28 : 7;
         if (rule.metric === "winrate") {
-          if (g.nonlinear) return;
+          if (g.nonlinear || !g.levels) return;
           const a = levels(Object.assign({}, F, { from: E - 6, to: E })), b = levels(Object.assign({}, F, { from: E - 6 - shift, to: E - shift }));
           a.levels.forEach(function (lv, i) { const p = b.levels[i]; const ch = lv.winRate - p.winRate; if (lv.reach >= rule.minSample && -ch * 100 >= rule.threshold) out.push(mk(rule, g, "Level " + lv.level + " win rate", lv.winRate, p.winRate, ch, true, "levels", "Level " + lv.level)); });
           return;

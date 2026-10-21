@@ -180,7 +180,7 @@ function MonetizationPage() {
           <KpiCard loading={loading} compareLabel={C} {...kpi(S, "arpdau", "ARPDAU", M, { color: "var(--metric-total)", info: "Σ revenue ÷ Σ DAU." })} />
           <KpiCard loading={loading} compareLabel={C} {...kpi(S, "arpu", "ARPU", M, { noSpark: true, info: "Revenue ÷ unique active users in range (WAU/MAU, modeled)." })} />
           <KpiCard loading={loading} compareLabel={C} {...kpi(S, "revPerSession", "Revenue / session", function (v) { return fmt.money(v, true); })} />
-          <KpiCard loading={loading} label="Revenue / new user" value={fmt.money(k.rev / k.newUsers)} delta={S.pk ? GP.delta(k.rev / k.newUsers, S.pk.rev / S.pk.newUsers) : null} compareLabel={C} info="Period revenue ÷ new users in the period. Not an LTV — see User Acquisition for cohort LTV." source="Demo data" />
+          <KpiCard loading={loading} label="Revenue / new user" value={fmt.money(k.rev / k.newUsers)} delta={S.pk ? GP.delta(k.rev / k.newUsers, S.pk.rev / S.pk.newUsers) : null} compareLabel={C} info="Period revenue ÷ new users in the period. Not an LTV — see User Acquisition for cohort LTV." source={D.LIVE ? "GA4 · Windsor" : "Demo data"} />
         </Grid>
         <Section title="Revenue">
           <Cols min={440}>

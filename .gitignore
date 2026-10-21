@@ -1,0 +1,3 @@
+# Generated at deploy time by scripts/fetch-windsor.mjs (real GA4 data — keep out of git history)
+data/live.js
+.claude/

@@ -129,13 +129,13 @@ function TopBar({ F, setF, route, mobile, onMenu, theme, setTheme, onAI }) {
           style={{ height: 32, padding: "0 8px", borderRadius: 8, border: "1px solid var(--border-default)", background: "var(--bg-sunken)", color: "var(--text-primary)", font: "400 12px/1 var(--font-sans)" }} />
       ) : null}
       <div style={{ flex: 1 }}></div>
-      {mobile || window.innerWidth < 1240 ? null : <Tooltip content={"Data through " + fmt.day(D.N - 1, true) + ". Daily tables are finalized in UTC. Pipeline last ran " + fmt.ts(D.UPDATED_AT) + ". All values are synthetic demo data."} placement="bottom">
+      {mobile || window.innerWidth < 1240 ? null : <Tooltip content={"Data through " + fmt.day(D.N - 1, true) + ". Daily tables are finalized in UTC. Pipeline last ran " + fmt.ts(D.UPDATED_AT) + (D.LIVE ? ". Source: " + D.LIVE.source + ". Ads by format, UA spend, retention cohorts and tech health are still modeled." : ". All values are synthetic demo data.")} placement="bottom">
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6, font: "var(--type-caption)", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
           <span style={{ width: 6, height: 6, borderRadius: 3, background: "var(--positive)" }}></span>{window.innerWidth >= 1360 ? "Data through " + fmt.day(D.N - 1, true) + " · updated " + fmt.ts(D.UPDATED_AT) : "Updated " + fmt.ts(D.UPDATED_AT)}
         </span>
       </Tooltip>}
       {route !== "ai" ? (mobile ? <IconButton icon="sparkles" label="Ask AI" onClick={onAI} /> : <Button size="sm" iconLeft="sparkles" onClick={onAI}>Ask AI</Button>) : null}
-      {window.innerWidth < 1100 && !mobile ? <Tooltip content={"Demo data · updated " + fmt.ts(D.UPDATED_AT)} placement="bottom"><Badge tone="accent" icon="flask-conical">Demo</Badge></Tooltip> : <Badge tone="accent" icon="flask-conical">Demo data</Badge>}
+      {D.LIVE ? <Tooltip content={"Live · " + D.LIVE.source + " · updated " + fmt.ts(D.UPDATED_AT)} placement="bottom"><Badge tone="positive" icon="radio">Live · GA4</Badge></Tooltip> : window.innerWidth < 1100 && !mobile ? <Tooltip content={"Demo data · updated " + fmt.ts(D.UPDATED_AT)} placement="bottom"><Badge tone="accent" icon="flask-conical">Demo</Badge></Tooltip> : <Badge tone="accent" icon="flask-conical">Demo data</Badge>}
       <IconButton icon={theme === "dark" ? "sun" : "moon"} label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} onClick={function () { setTheme(theme === "dark" ? "light" : "dark"); }} />
     </div>
   );
