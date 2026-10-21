@@ -38,32 +38,57 @@
   (L.ret || []).forEach(function (t) { const k = t[0] + "|" + t[1] + "|" + t[2]; (RET[k] = RET[k] || {})[t[3]] = t[4]; });
   const hasRet = Object.keys(RET).length > 0;
 
-  const F = {}; L.fields.forEach(function (f, i) { F[f] = 4 + i; });
-  const ROWS = GAMES.map(function () { return []; });
-  L.rows.forEach(function (r) {
-    if (r[1] >= N) return;
-    const k = r[0] + "|" + r[1], s = stick[k], share = dauByGD[k] ? r[4] / dauByGD[k] : 0;
-    const v = function (f) { return F[f] != null ? r[F[f]] || 0 : 0; };
-    const row = { di: r[1], gi: r[0], pi: r[2], ci: r[3],
+  const F = {}; L.fields.forEach(function (f, i) { F[f] = i; });
+  /* one GA4 row → the metric-engine row shape. m = metric values (L.fields order); ret = { n: users } or undefined */
+  function makeRow(gi, d, pi, ci, m, stickShare, ret) {
+    const s = stick[gi + "|" + d];
+    const v = function (f) { return F[f] != null ? m[F[f]] || 0 : 0; };
+    const row = { di: d, gi: gi, pi: pi, ci: ci,
       dau: v("active_users"), nu: v("newusers"), ses: v("sessions"), pt: v("user_engagement_duration"), eng: v("engaged_sessions"), ev: v("event_count"),
       /* GA4 reports total ad impressions/revenue without a format split: booked under interstitial */
       ii: v("publisher_ad_impressions"), ir: 0, ib: 0, ia: 0, ri: v("total_ad_revenue"), rr: 0, rb: 0, ra: 0,
       req: 0, loaded: 0, rewOffers: 0, rewStarts: 0,
       payers: v("total_purchasers"), iapG: v("purchase_revenue"), iapRef: 0, purch: v("transactions"), firstPurch: v("first_time_purchasers"), subRev: 0,
       orgI: 0, paidI: 0, spend: 0,
-      wau: s ? s[2] * share : 0, mau: s ? s[3] * share : 0, crashUsers: s ? s[4] * share : 0, d1r: 0 };
-    const c = RET[r[0] + "|" + r[1] + "|" + r[2]], size = c && c[0];
-    const rate = function (n) { return size && c[n] ? Math.min(1, c[n] / size) : 0; };
+      wau: s ? s[2] * stickShare : 0, mau: s ? s[3] * stickShare : 0, crashUsers: s ? s[4] * stickShare : 0, d1r: 0 };
+    const size = ret && ret[0];
+    const rate = function (n) { return size && ret[n] ? Math.min(1, ret[n] / size) : 0; };
     for (let n = 1; n <= 14; n++) row["r" + n] = row.nu * rate(n);
     row.r30 = row.nu * rate(30);
     row.d1r = rate(1);
     row.noRet = !size; /* no cohort for this day/platform: leave it out instead of counting 0% */
-    ROWS[r[0]].push(row);
+    return row;
+  }
+  const ROWS = GAMES.map(function () { return []; });
+  L.rows.forEach(function (r) {
+    if (r[1] >= N) return;
+    const k = r[0] + "|" + r[1];
+    ROWS[r[0]].push(makeRow(r[0], r[1], r[2], r[3], r.slice(4), dauByGD[k] ? r[4] / dauByGD[k] : 0, RET[r[0] + "|" + r[1] + "|" + r[2]]));
+  });
+
+  /* filter slices (version / source+campaign / new-vs-returning): same rows split by one GA4 dimension, no country.
+     r.k holds the dimension value indexes. WAU/MAU are spread by DAU share, like the country rows. */
+  const SLICES = {};
+  Object.keys(L.slices || {}).forEach(function (name) {
+    const S = L.slices[name], nd = S.dims.length, off = 3 + nd;
+    const sret = {};
+    (S.ret || []).forEach(function (t) { const k = t.slice(0, off).join("|"); (sret[k] = sret[k] || {})[t[off]] = t[off + 1]; });
+    const rows = GAMES.map(function () { return []; });
+    const usage = S.vals.map(function (v) { return v.map(function () { return 0; }); });
+    S.rows.forEach(function (r) {
+      if (r[1] >= N) return;
+      const m = r.slice(off), gd = r[0] + "|" + r[1];
+      const row = makeRow(r[0], r[1], r[2], -1, m, dauByGD[gd] ? m[F.active_users] / dauByGD[gd] : 0, sret[r.slice(0, off).join("|")]);
+      row.k = r.slice(3, off);
+      row.k.forEach(function (x, j) { usage[j][x] += row.dau; });
+      rows[r[0]].push(row);
+    });
+    SLICES[name] = { dims: S.dims, vals: S.vals, usage: usage, ROWS: rows, retention: (S.ret || []).length > 0 };
   });
 
   Object.assign(D, {
     END: dates[N - 1], N: N, dates: dates, COUNTRIES: COUNTRIES, GAMES: GAMES, ROWS: ROWS,
     CAMPAIGNS: GAMES.map(function () { return []; }), EXPERIMENTS: [], UPDATED_AT: L.updatedAt,
-    LIVE: { source: L.source, updatedAt: L.updatedAt, retention: hasRet }
+    SLICES: SLICES, LIVE: { source: L.source, updatedAt: L.updatedAt, retention: hasRet }
   });
 })();

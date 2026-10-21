@@ -145,9 +145,23 @@ function FilterBar({ F, setF, route, mobile, onReset, onSave, presets, onPreset,
   const A = window.APPLY[route] || {};
   const r = function (k) { return window.reasonFor(route, k); };
   const g = F.game !== "all" ? window.gameById(F.game) : null;
-  const versions = []; (g ? [g] : D.GAMES).forEach(function (x) { x.versions.forEach(function (v) { if (versions.indexOf(v.v) < 0) versions.push(v.v); }); });
-  const sources = ["Google Ads", "Meta Ads", "AppLovin", "Unity Ads", "TikTok Ads", "Mintegral"];
-  const camps = (g ? D.CAMPAIGNS[D.GAMES.indexOf(g)] : []).filter(function (c) { return F.source === "all" || F.source === "paid" || c.source === F.source; });
+  const SL = D.SLICES;
+  /* live: options come from the GA4 slices for the selected game, most-used first */
+  const sliceOpts = function (name, j, keep) {
+    const sl = SL && SL[name]; if (!sl) return [];
+    const use = {}; (g ? [D.GAMES.indexOf(g)] : D.GAMES.map(function (_, i) { return i; })).forEach(function (gi) { sl.ROWS[gi].forEach(function (r) { if (keep && !keep(r)) return; const v = sl.vals[j][r.k[j]]; use[v] = (use[v] || 0) + r.dau; }); });
+    const special = function (v) { return /^\(.*\)$/.test(v) ? 1 : 0; }; /* "(other)", "(not set)" go last */
+    const semver = function (a, b) { const x = a.split("."), y = b.split("."); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (parseInt(y[i], 10) || 0) - (parseInt(x[i], 10) || 0); if (d) return d; } return 0; };
+    return Object.keys(use).filter(function (v) { return use[v] > 0; }).sort(function (a, b) { return special(a) - special(b) || (name === "version" ? semver(a, b) : use[b] - use[a]); });
+  };
+  const versions = []; if (SL) sliceOpts("version", 0).forEach(function (v) { versions.push(v); }); else (g ? [g] : D.GAMES).forEach(function (x) { x.versions.forEach(function (v) { if (versions.indexOf(v.v) < 0) versions.push(v.v); }); });
+  const sources = SL ? sliceOpts("source", 0) : ["Google Ads", "Meta Ads", "AppLovin", "Unity Ads", "TikTok Ads", "Mintegral"];
+  const srcIdx = SL && SL.source ? SL.source.vals[0].indexOf(F.source) : -1;
+  const camps = SL ? sliceOpts("source", 1, function (r) { return F.source === "all" || r.k[0] === srcIdx; }).map(function (c) { return { id: c, name: c }; })
+    : (g ? D.CAMPAIGNS[D.GAMES.indexOf(g)] : []).filter(function (c) { return F.source === "all" || F.source === "paid" || c.source === F.source; });
+  const sliceOn = window.sliceActive(F);
+  /* picking one slice filter clears the others: GA4 slices are fetched one dimension at a time */
+  const only = function (patch) { return Object.assign(SL ? { version: "all", source: "all", campaign: "all", userType: "all" } : {}, patch); };
   const show = !(route === "sources" || route === "settings");
   if (!show) return null;
   return (
@@ -155,15 +169,15 @@ function FilterBar({ F, setF, route, mobile, onReset, onSave, presets, onPreset,
       {mobile ? <Select size="sm" label="vs" options={[{ value: "prev", label: "Prev. period" }, { value: "wow", label: "Last week" }, { value: "none", label: "None" }]} value={A.compare ? F.compare : "none"} onChange={function (v) { setF({ compare: v }); }} disabled={!A.compare} disabledReason={r("compare")} /> : null}
       <Select size="sm" label="Platform" value={F.platform} onChange={function (v) { setF({ platform: v }); }} disabled={!A.platform} disabledReason={r("platform")}
         options={[{ value: "all", label: "All" }, { value: "android", label: "Android" }, { value: "ios", label: "iOS" }]} />
-      <Select size="sm" label="Country" multiple searchable placeholder="All" value={F.countries} onChange={function (v) { setF({ countries: v }); }} disabled={!A.countries} disabledReason={r("countries")} menuWidth={220}
+      <Select size="sm" label="Country" multiple searchable placeholder="All" value={F.countries} onChange={function (v) { setF({ countries: v }); }} disabled={!A.countries || sliceOn} disabledReason={sliceOn ? "Country can't be combined with Version / Source / Campaign / Users — GA4 returns those without a country split." : r("countries")} menuWidth={220}
         options={D.COUNTRIES.map(function (c) { return { value: c.code, label: c.name, prefix: <span style={{ font: "500 10.5px/1 var(--font-mono)", color: "var(--text-tertiary)", width: 18 }}>{c.code}</span> }; })} />
-      <Select size="sm" label="Version" value={F.version} onChange={function (v) { setF({ version: v }); }} disabled={!A.version} disabledReason={r("version")}
+      <Select size="sm" label="Version" value={F.version} onChange={function (v) { setF(only({ version: v })); }} disabled={!A.version} disabledReason={r("version")}
         options={[{ value: "all", label: "All" }].concat(versions.map(function (v) { return { value: v, label: v }; }))} />
-      <Select size="sm" label="Source" value={F.source} onChange={function (v) { setF({ source: v, campaign: "all" }); }} disabled={!A.source} disabledReason={r("source")} menuWidth={200}
-        options={[{ value: "all", label: "All" }, { value: "organic", label: "Organic" }, { value: "paid", label: "Non-organic (all paid)" }, { value: "d", divider: true }].concat(sources.map(function (s) { return { value: s, label: s }; }))} />
-      <Select size="sm" label="Campaign" value={F.campaign} onChange={function (v) { setF({ campaign: v }); }} disabled={!A.campaign || !g || F.source === "organic"} disabledReason={!A.campaign ? r("campaign") : !g ? "Select a single game to filter by campaign." : "Organic installs have no campaign."} menuWidth={260} searchable
+      <Select size="sm" label="Source" value={F.source} onChange={function (v) { setF(only({ source: v, campaign: "all" })); }} disabled={!A.source} disabledReason={r("source")} menuWidth={200}
+        options={(SL ? [{ value: "all", label: "All" }] : [{ value: "all", label: "All" }, { value: "organic", label: "Organic" }, { value: "paid", label: "Non-organic (all paid)" }, { value: "d", divider: true }]).concat(sources.map(function (s) { return { value: s, label: s }; }))} />
+      <Select size="sm" label="Campaign" value={F.campaign} onChange={function (v) { setF(Object.assign(only({ campaign: v }), { source: F.source })); }} disabled={!A.campaign || (!SL && (!g || F.source === "organic"))} disabledReason={!A.campaign ? r("campaign") : !g ? "Select a single game to filter by campaign." : "Organic installs have no campaign."} menuWidth={320} searchable
         options={[{ value: "all", label: "All" }].concat(camps.map(function (c) { return { value: c.id, label: c.name, description: c.source }; }))} />
-      <Select size="sm" label="Users" value={F.userType} onChange={function (v) { setF({ userType: v }); }} disabled={!A.userType} disabledReason={r("userType")}
+      <Select size="sm" label="Users" value={F.userType} onChange={function (v) { setF(only({ userType: v })); }} disabled={!A.userType} disabledReason={r("userType")}
         options={[{ value: "all", label: "All" }, { value: "new", label: "New" }, { value: "returning", label: "Returning" }]} />
       <div style={{ flex: 1, minWidth: 8 }}></div>
       <Button size="sm" variant="ghost" iconLeft="rotate-ccw" onClick={onReset}>Reset</Button>

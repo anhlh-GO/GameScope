@@ -15,14 +15,36 @@
   }
   /* user-type split: new users monetize & engage less than returning (modeled) */
   function utFactor(r, ut) {
-    if (!ut || ut === "all") return null;
+    if (!ut || ut === "all" || D.LIVE) return null; /* live data: new/returning comes from the real GA4 slice */
     const f = r.dau ? r.nu / r.dau : 0;
     return ut === "new" ? { dau: f, act: f * .82, mon: f * .55 } : { dau: 1 - f, act: 1 - f * .82, mon: 1 - f * .55 };
   }
+  /* live data: a Version / Source / Campaign / Users filter reads the matching GA4 slice instead of the
+     country rows (slices have no country split). Only one slice applies at a time, in this priority. */
+  function sliceFor(F) {
+    if (F.__slice) return F.__slice;
+    const S = D.SLICES; if (!S) return null;
+    const pick = function (name, tests) {
+      const sl = S[name]; if (!sl) return null;
+      const idx = tests.map(function (t) { return t == null ? null : sl.vals[t.dim].indexOf(t.value); });
+      return { sl: sl, test: function (r) { for (let j = 0; j < tests.length; j++) { if (tests[j] && r.k[tests[j].dim] !== idx[j]) return false; } return true; } };
+    };
+    if (F.version && F.version !== "all") return pick("version", [{ dim: 0, value: F.version }]);
+    const src = F.source && F.source !== "all" ? F.source : null, camp = F.campaign && F.campaign !== "all" ? F.campaign : null;
+    if (src || camp) return pick("source", [src ? { dim: 0, value: src } : null, camp ? { dim: 1, value: camp } : null]);
+    if (F.userType && F.userType !== "all") return pick("user", [{ dim: 0, value: F.userType }]);
+    return null;
+  }
   function scan(F, from, to, cb) {
+    const sl = sliceFor(F);
     gameIdx(F).forEach(function (gi) {
-      const rows = D.ROWS[gi];
-      for (let i = 0; i < rows.length; i++) { const r = rows[i]; if (r.di < from || r.di > to) continue; if (!matchRow(r, F)) continue; cb(r); }
+      const rows = sl ? sl.sl.ROWS[gi] : D.ROWS[gi];
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i]; if (r.di < from || r.di > to) continue;
+        if (sl) { if (!sl.test(r)) continue; if (F.platform && F.platform !== "all" && D.PLATFORMS[r.pi].id !== F.platform) continue; }
+        else if (!matchRow(r, F)) continue;
+        cb(r);
+      }
     });
   }
   function addUT(a, r, ut) {
@@ -39,10 +61,11 @@
     const len = to - from + 1;
     const total = zero(), byDay = [], byGame = {}, byCountry = {}, byPlatform = {};
     for (let i = 0; i < len; i++) byDay.push(zero());
+    if (D.LIVE && opts.userType && opts.userType !== "all") F = Object.assign({}, F, { userType: opts.userType });
     scan(F, from, to, function (r) {
       const ut = opts.userType;
       addUT(total, r, ut); addUT(byDay[r.di - from], r, ut);
-      const g = D.GAMES[r.gi].id, c = D.COUNTRIES[r.ci].code, p = D.PLATFORMS[r.pi].id;
+      const g = D.GAMES[r.gi].id, c = r.ci >= 0 ? D.COUNTRIES[r.ci].code : "—", p = D.PLATFORMS[r.pi].id;
       (byGame[g] = byGame[g] || zero()); addUT(byGame[g], r, ut);
       (byCountry[c] = byCountry[c] || zero()); addUT(byCountry[c], r, ut);
       (byPlatform[p] = byPlatform[p] || zero()); addUT(byPlatform[p], r, ut);
@@ -118,7 +141,15 @@
   function retentionBy(F, dim) {
     const R = ranges(F);
     let key;
-    if (dim === "country") key = function (r) { return D.COUNTRIES[r.ci].code; };
+    /* live: version / campaign / source breakdowns read their GA4 slice (other slice filters don't combine) */
+    const ls = D.SLICES && { version: ["version", 0], campaign: ["source", 1], source: ["source", 0] }[dim];
+    if (ls && D.SLICES[ls[0]]) {
+      const sl = D.SLICES[ls[0]], j = ls[1];
+      const Fs = Object.assign({}, F, { __slice: { sl: sl, test: function () { return true; } } });
+      const g = cohortRows(Fs, R.from, R.to, function (r) { return sl.vals[j][r.k[j]]; });
+      return Object.keys(g).map(function (k) { const w = weighted([g[k]]); return { key: k, size: g[k].size, r: w.r }; }).sort(function (a, b) { return b.size - a.size; });
+    }
+    if (dim === "country") key = function (r) { return r.ci >= 0 ? D.COUNTRIES[r.ci].code : "—"; };
     else if (dim === "platform") key = function (r) { return D.PLATFORMS[r.pi].name; };
     else if (dim === "game") key = function (r) { return D.GAMES[r.gi].name; };
     else if (dim === "version") key = function (r) { const g = D.GAMES[r.gi]; const age = D.N - 1 - r.di; let v = g.versions[0].v; g.versions.forEach(function (x) { if (x.age >= age + 3) v = x.v; }); return v; };
@@ -221,7 +252,7 @@
     const map = {};
     gis.forEach(function (gi) { D.CAMPAIGNS[gi].forEach(function (c) { map[c.id] = { c: c, spend: 0, installs: 0, d1n: 0, d7n: 0, d1b: 0, d7b: 0, rev: { 0: 0, 1: 0, 3: 0, 7: 0, 30: 0 }, sp: { 0: 0, 1: 0, 3: 0, 7: 0, 30: 0 }, countries: {} }; }); });
     scan(F, R.from, R.to, function (r) {
-      const g = D.GAMES[r.gi], cc = D.COUNTRIES[r.ci].code;
+      const g = D.GAMES[r.gi], cc = r.ci >= 0 ? D.COUNTRIES[r.ci].code : "—";
       const cs = D.CAMPAIGNS[r.gi].filter(function (c) { return c.pi === r.pi && c.countries.indexOf(cc) >= 0; });
       const wi = cs.reduce(function (a, c) { return a + c.w; }, 0), ws = cs.reduce(function (a, c) { return a + c.w * c.cpiMult; }, 0);
       const arpu = r.dau ? (r.ri + r.rr + r.rb + r.ra + r.iapG) / r.dau : 0;

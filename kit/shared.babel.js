@@ -30,16 +30,19 @@ const NA = {
   own: "This page defines its own scope.",
   ab: "Experiments carry their own population; only the game filter applies."
 };
-const ALL = { game: 1, platform: 1, countries: 1, version: 0, source: 0, campaign: 0, userType: 0, compare: 1 };
+const SL = D.SLICES || {};
+const ALL = { game: 1, platform: 1, countries: 1, version: SL.version ? 1 : 0, source: SL.source ? 1 : 0, campaign: SL.source ? 1 : 0, userType: SL.user ? 1 : 0, compare: 1 };
 const APPLY = {
-  portfolio: Object.assign({}, ALL, { game: 0 }), overview: ALL, engagement: Object.assign({}, ALL, { userType: 1 }), retention: ALL, levels: ALL, monetization: ALL,
-  ua: Object.assign({}, ALL, { source: 1, campaign: 1 }), tech: Object.assign({}, ALL, { countries: 0, version: 1 }), ai: ALL, alerts: { compare: 0 }, ab: { game: 1 }, events: ALL, reports: ALL, sources: {}, settings: {}
+  portfolio: Object.assign({}, ALL, { game: 0 }), overview: ALL, engagement: Object.assign({}, ALL, { userType: 1 }), retention: Object.assign({}, ALL, { userType: 0 }), levels: ALL, monetization: ALL,
+  ua: Object.assign({}, ALL, { source: 1, campaign: 1 }), tech: Object.assign({}, ALL, { countries: 0, version: D.LIVE ? 0 : 1 }), ai: ALL, alerts: { compare: 0 }, ab: { game: 1 }, events: ALL, reports: ALL, sources: {}, settings: {}
 };
+/* live GA4 slices have no country split and don't combine with each other */
+function sliceActive(F) { return !!(D.SLICES && ((F.version && F.version !== "all") || (F.source && F.source !== "all") || (F.campaign && F.campaign !== "all") || (F.userType && F.userType !== "all"))); }
 function reasonFor(route, key) {
   if (route === "alerts" || route === "sources" || route === "settings") return NA.own;
   if (route === "ab") return NA.ab;
   if (key === "game") return NA.game;
-  if (key === "version") return NA.version;
+  if (key === "version") return D.LIVE && route === "tech" ? "Crash data by version isn't connected yet." : NA.version;
   if (key === "source" || key === "campaign") return NA.source;
   if (key === "userType") return route === "retention" ? NA.retUser : NA.userType;
   if (key === "countries" && route === "tech") return NA.techCountry;
@@ -58,6 +61,7 @@ function effective(F, route) {
   Object.keys(DEFAULT_F).forEach(function (k) { if (k in ALL && !a[k]) out[k] = DEFAULT_F[k]; });
   if (route === "portfolio") out.game = "all";
   if (!a.compare) out.compare = "none";
+  if (sliceActive(out)) out.countries = [];
   return out;
 }
 function encode(F) {
@@ -169,6 +173,6 @@ function kpi(S, key, label, f, o) {
 }
 function gameById(id) { return D.GAMES.find(function (g) { return g.id === id; }); }
 
-Object.assign(window, { ROUTES: ROUTES, APPLY: APPLY, NA: NA, reasonFor: reasonFor, DEFAULT_F: DEFAULT_F, rangeOf: rangeOf, effective: effective, encode: encode, decode: decode, AppCtx: AppCtx, useApp: useApp,
+Object.assign(window, { sliceActive: sliceActive, ROUTES: ROUTES, APPLY: APPLY, NA: NA, reasonFor: reasonFor, DEFAULT_F: DEFAULT_F, rangeOf: rangeOf, effective: effective, encode: encode, decode: decode, AppCtx: AppCtx, useApp: useApp,
   useLoading: useLoading, keyOf: keyOf, PageHeader: PageHeader, Grid: Grid, Cols: Cols, Section: Section, ChartCard: ChartCard, NeedGame: NeedGame, SimGate: SimGate, xday: xday, csv: csv, compareLabel: compareLabel, kpi: kpi, gameById: gameById });
 });

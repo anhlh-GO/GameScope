@@ -109,7 +109,7 @@ function RetentionPage() {
   }, [key, grain, mode]);
   const curve = COLS.map(function (n) { return { x: n, cur: cur[n], prev: prevMode ? prevMode[n] : null }; });
   const byDim = React.useMemo(function () {
-    if (dim === "campaign") {
+    if (dim === "campaign" && !D.SLICES) {
       if (F.game === "all") return null;
       return GP.campaigns(F).map(function (c) { return { key: c.name, size: c.installs, r: { 1: c.d1, 7: c.d7 }, src: c.source }; }).sort(function (a, b) { return b.size - a.size; });
     }
@@ -150,16 +150,16 @@ function RetentionPage() {
             <LineChart data={curve} xKey="x" xFormat={function (v) { return "D" + v; }} yFormat={function (v) { return fmt.pct(v, 0); }} zoomable={false} yMin={0}
               series={[{ key: "cur", label: "Selected period", color: "var(--accent)", area: true }].concat(prevMode ? [{ key: "prev", label: "Comparison", color: "var(--chart-compare)", dashed: true }] : [])} />
           </ChartCard>
-          <ChartCard loading={loading} title="Retention by segment" actions={<SegmentedControl value={dim} onChange={setDim} options={[{ value: "country", label: "Country" }, { value: "platform", label: "Platform" }, { value: "game", label: "Game" }, { value: "campaign", label: "Campaign" }, { value: "version", label: "Version" }, { value: "firstlevel", label: "Day-0 level" }]} />}>
+          <ChartCard loading={loading} title="Retention by segment" actions={<SegmentedControl value={dim} onChange={setDim} options={[{ value: "country", label: "Country" }, { value: "platform", label: "Platform" }, { value: "game", label: "Game" }].concat(D.SLICES ? [{ value: "source", label: "Source" }] : []).concat([{ value: "campaign", label: "Campaign" }, { value: "version", label: "Version" }]).concat(D.SLICES ? [] : [{ value: "firstlevel", label: "Day-0 level" }])} />}>
             {byDim == null ? <div style={{ color: "var(--text-tertiary)", padding: "24px 0" }}>Select a single game to compare campaigns.</div> :
               <BarChart data={byDim.slice(0, 10)} xKey="key" yFormat={function (v) { return fmt.pct(v, 0); }} series={[{ key: "d1", label: "D1", color: "var(--accent)" }, { key: "d7", label: "D7", color: "var(--chart-6)" }].map(function (s) { return s; })}
                 xFormat={function (v) { return String(v).length > 12 ? String(v).slice(0, 11) + "…" : v; }} {...{ data: byDim.slice(0, 10).map(function (r) { return { key: r.key, d1: r.r[1], d7: r.r[7] }; }) }} />}
           </ChartCard>
         </Cols>
         {byDim ? <Card style={{ marginTop: 12 }}>
-          <DataTable dense rowKey="key" rows={byDim} pageSize={10} columns={[{ key: "key", header: dim === "firstlevel" ? "Highest level reached on D0" : "Segment", align: "left" }, { key: "size", header: dim === "campaign" ? "Attributed installs" : "Cohort users", format: fmt.int }]
+          <DataTable dense rowKey="key" rows={byDim} pageSize={10} columns={[{ key: "key", header: dim === "firstlevel" ? "Highest level reached on D0" : "Segment", align: "left" }, { key: "size", header: dim === "campaign" && !D.SLICES ? "Attributed installs" : "Cohort users", format: fmt.int }]
             .concat([1, 3, 7, 14, 30].map(function (n) { return { key: "d" + n, header: "D" + n, sortValue: function (r) { return r.r[n]; }, render: function (r) { return r.r[n] == null ? <span style={{ color: "var(--text-disabled)" }}>N/A</span> : P(r.r[n]); } }; }))}
-            footerNote={dim === "campaign" ? "Campaign retention comes from attribution data (AppsFlyer / Adjust) and is not merged with Firebase cohorts." : dim === "firstlevel" ? "Modeled split in demo data: players who progress further on day 0 retain better — correlation, not causation." : "Each segment is weighted by its own cohort sizes."} />
+            footerNote={D.SLICES && (dim === "campaign" || dim === "source" || dim === "version") ? "GA4 cohorts by first-user source / campaign or app version. Country filters don't apply to this breakdown." : dim === "campaign" ? "Campaign retention comes from attribution data (AppsFlyer / Adjust) and is not merged with Firebase cohorts." : dim === "firstlevel" ? "Modeled split in demo data: players who progress further on day 0 retain better — correlation, not causation." : "Each segment is weighted by its own cohort sizes."} />
         </Card> : null}
       </Section>
     </div>
