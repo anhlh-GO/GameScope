@@ -117,12 +117,12 @@ function TopBar({ F, setF, route, mobile, onMenu, theme, setTheme, onAI }) {
   const cmpOpts = [{ value: "prev", label: "Previous period" }, { value: "wow", label: "Same period last week" }, { value: "custom", label: "Custom start…" }, { value: "none", label: "No comparison" }];
   function setRange(v) { const r = window.rangeOf(v, F); setF({ range: v, from: r[0], to: r[1] }); }
   return (
-    <div style={{ height: 56, display: "flex", alignItems: "center", gap: 8, minWidth: 0, overflow: "hidden", padding: mobile ? "0 12px" : "0 20px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-app)", position: "sticky", top: 0, zIndex: 20 }}>
+    <div style={{ height: 56, display: "flex", alignItems: "center", gap: 8, minWidth: 0, overflow: "visible" /* "hidden" clipped the game / range / compare menus */, padding: mobile ? "0 12px" : "0 20px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-app)", position: "sticky", top: 0, zIndex: 20 }}>
       {mobile ? <IconButton icon="menu" label="Open menu" onClick={onMenu} /> : null}
       <Select options={gameOpts} value={route === "portfolio" ? "all" : F.game} onChange={function (v) { setF({ game: v }); }} disabled={!A.game} disabledReason={window.reasonFor(route, "game")} menuWidth={260} width={mobile ? 150 : undefined} searchable />
-      <Select options={rangeOpts} value={F.range} onChange={setRange} width={mobile ? 124 : undefined} />
+      <Select options={rangeOpts} value={F.range} onChange={setRange} width={mobile ? 124 : undefined} menuWidth={200} />
       {F.range === "custom" && !mobile ? <DateInputs F={F} setF={setF} /> : null}
-      {mobile ? null : <Select label="vs" options={cmpOpts} value={A.compare ? F.compare : "none"} onChange={function (v) { setF({ compare: v, compareFrom: v === "custom" ? Math.max(0, F.from - (F.to - F.from + 1)) : null }); }} disabled={!A.compare} disabledReason={window.reasonFor(route, "compare")} />}
+      {mobile ? null : <Select label="vs" menuWidth={220} options={cmpOpts} value={A.compare ? F.compare : "none"} onChange={function (v) { setF({ compare: v, compareFrom: v === "custom" ? Math.max(0, F.from - (F.to - F.from + 1)) : null }); }} disabled={!A.compare} disabledReason={window.reasonFor(route, "compare")} />}
       {F.compare === "custom" && A.compare && !mobile ? (
         <input type="date" aria-label="Comparison start" min={D.iso(D.dates[0])} max={D.iso(D.dates[F.from - 1] || D.dates[0])} value={D.iso(D.dates[F.compareFrom || 0])}
           onChange={function (e) { const i = D.dates.indexOf(Date.parse(e.target.value + "T00:00:00Z")); if (i >= 0) setF({ compareFrom: i }); }}
