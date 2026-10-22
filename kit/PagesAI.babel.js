@@ -233,6 +233,13 @@ function buildContext(F, q) {
     canh_bao: GP.runAlerts().slice(0, 10).map(function (x) { return { muc_do: x.severity, game: x.game, chi_so: x.label, hien_tai: r4(x.current), truoc: r4(x.previous), thay_doi: r4(x.change), don_vi: x.pp ? "pp" : "ti_le" }; })
   };
   if (!g && D.GAMES.length > 1) data.theo_game = topRows(S.cur.byGame, S.R.len, 20);
+  /* level funnel (single game only): players starting / winning each level and the share who never start the next one */
+  const LV = g ? GP.levels(F) : null;
+  data.funnel_level = !g ? "chọn 1 game để có funnel level" : !LV ? "game này chưa có event level" : {
+    cot: ["level", "nguoi_bat_dau", "luot_bat_dau", "nguoi_thang", "win_rate_moi_luot", "ti_le_hoan_thanh", "drop_sang_level_sau", "it_mau"],
+    ghi_chu: "Người chơi = tổng user theo ngày. drop_sang_level_sau = người thắng level này nhưng không bắt đầu level kế tiếp (null nếu không tính được; âm/0 khi level sau có nhiều người hơn, có thể do thứ tự chơi khác số level).",
+    dong: LV.levels.map(function (l) { return [l.level, Math.round(l.reach), Math.round(l.starts), Math.round(l.winUsers != null ? l.winUsers : l.wins), r4(l.winRate), r4(l.completionRate), r4(l.drop), l.small ? 1 : 0]; })
+  };
   const notes = [
     "Tỉ lệ (retention, arpdau…) là số thập phân: 0.269 = 26.9%. Tiền là USD. Thời gian là giây. null = chưa đủ dữ liệu (cohort chưa đủ tuổi), KHÔNG phải 0.",
     "DAU là trung bình ngày; với tất cả game là tổng DAU từng game. Doanh thu quảng cáo GA4 không tách theo định dạng (interstitial/rewarded/banner).",
@@ -263,7 +270,7 @@ function HandoffCard({ m }) {
       <span style={{ width: 26, height: 26, flex: "none", borderRadius: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", background: "var(--accent-soft)", color: "var(--accent-text)" }}><Icon name="clipboard-list" size={14} /></span>
       <div style={{ flex: 1, minWidth: 0, color: "var(--text-secondary)", lineHeight: 1.6 }}>
         <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>Đã chuẩn bị dữ liệu cho câu hỏi này</div>
-        <div style={{ font: "var(--type-caption)", color: "var(--text-tertiary)", marginTop: 2 }}>{m.handoff.scope} · KPI, xu hướng theo ngày, retention, quốc gia, nguồn, campaign, version · khoảng {kb} KB</div>
+        <div style={{ font: "var(--type-caption)", color: "var(--text-tertiary)", marginTop: 2 }}>{m.handoff.scope} · KPI, xu hướng, retention, funnel level, quốc gia, nguồn, campaign, version · khoảng {kb} KB</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
           {AI_SITES.map(function (s) { return <Button key={s.id} size="sm" variant={s.id === "claude" ? "primary" : "secondary"} iconLeft={s.icon} onClick={function () { go(s); }}>{s.label}</Button>; })}
           <Button size="sm" variant="ghost" iconLeft="copy" onClick={function () { go(null); }}>Chỉ copy</Button>
@@ -357,7 +364,7 @@ function AIPage() {
   const wide = window.innerWidth >= 1240;
   const tools = ["get_kpis", "get_breakdown", "get_timeseries", "get_retention", "get_alerts", "get_levels", "get_campaigns", "get_tech_health", "render_chart"];
   const handoff = !(window.claude && window.claude.complete);
-  const packs = ["KPI kỳ này và kỳ trước", "Xu hướng theo ngày (DAU, user mới, doanh thu, ARPDAU)", "Retention D1–D14, D30", "Top 15 quốc gia", "Nền tảng", "Source, campaign, version (kèm D1/D7)", "Cảnh báo bất thường"];
+  const packs = ["KPI kỳ này và kỳ trước", "Funnel level (khi chọn 1 game)", "Xu hướng theo ngày (DAU, user mới, doanh thu, ARPDAU)", "Retention D1–D14, D30", "Top 15 quốc gia", "Nền tảng", "Source, campaign, version (kèm D1/D7)", "Cảnh báo bất thường"];
   return (
     <div style={{ display: "grid", gridTemplateColumns: wide ? "minmax(0,1fr) 300px" : "1fr", gap: 20, height: app.mobile ? "auto" : "calc(100vh - 170px)", minHeight: 520 }}>
       <div style={{ display: "flex", flexDirection: "column", minHeight: 0, maxWidth: 860, width: "100%" }}>
