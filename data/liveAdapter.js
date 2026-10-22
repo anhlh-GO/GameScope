@@ -13,7 +13,7 @@
 
   let names = null; try { names = new Intl.DisplayNames(["en"], { type: "region" }); } catch (e) {}
   const COUNTRIES = L.countries.map(function (c) {
-    let name = c; if (c === "ZZ") name = "Unknown"; else if (names) { try { name = names.of(c) || c; } catch (e) {} }
+    let name = c; if (c === "ZZ") name = "Unknown / other"; else if (names) { try { name = names.of(c) || c; } catch (e) {} }
     return { code: c, name: name };
   });
 

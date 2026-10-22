@@ -27,14 +27,16 @@ const REV = ["purchase_revenue", "total_ad_revenue", "transactions", "total_purc
 const iso = (t) => new Date(t).toISOString().slice(0, 10);
 const DAY = 86400000;
 const today = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate());
-const from = today - (DAYS - 1) * DAY;
+/* stop at yesterday (UTC): today's GA4 numbers are partial and would drag averages down */
+const end = today - DAY;
+const from = end - (DAYS - 1) * DAY;
 
 async function load(name) {
   const dirArg = process.argv.indexOf("--from-dir");
   if (dirArg > 0) return JSON.parse((await readFile(join(process.argv[dirArg + 1], name + ".json"), "utf8")).replace(/^﻿/, "")).data || [];
   const key = process.env.WINDSOR_API_KEY;
   if (!key) throw new Error("WINDSOR_API_KEY is not set");
-  const url = `${BASE}?api_key=${encodeURIComponent(key)}&date_from=${iso(from)}&date_to=${iso(today)}&fields=${Q[name]}` + (QF[name] ? `&filter=${encodeURIComponent(JSON.stringify(QF[name]))}` : "");
+  const url = `${BASE}?api_key=${encodeURIComponent(key)}&date_from=${iso(from)}&date_to=${iso(end)}&fields=${Q[name]}` + (QF[name] ? `&filter=${encodeURIComponent(JSON.stringify(QF[name]))}` : "");
   for (let attempt = 1; ; attempt++) {
     const res = await fetch(url, { signal: AbortSignal.timeout(300000) });
     const text = await res.text();
@@ -80,6 +82,7 @@ const rows = new Map();
 function row(r) {
   const gi = gIndex.get(String(r.account_id)), d = di(r.date), pi = platformIdx(r.platform);
   if (gi == null || pi < 0 || d < 0 || d >= DAYS) return null;
+  if (/^\(other\)$/i.test(String(r.country_id))) return null; /* GA4 cardinality bucket: replaced by the residual below */
   const c = ci(r.country_id), k = gi + "|" + d + "|" + pi + "|" + c;
   let o = rows.get(k);
   if (!o) { o = [gi, d, pi, c].concat(new Array(CORE.length + REV.length).fill(0)); rows.set(k, o); }
@@ -87,6 +90,38 @@ function row(r) {
 }
 for (const r of core) { const o = row(r); if (o) CORE.forEach((f, i) => { o[4 + i] += num(r[f]); }); }
 for (const r of revenue) { const o = row(r); if (o) REV.forEach((f, i) => { o[4 + CORE.length + i] += num(r[f]); }); }
+
+/* reconcile country rows with GA4 totals (no country split): GA4 folds countries into "(other)" on busy days and the
+   country rows then don't add up. Missing volume goes to ZZ ("Unknown / other"); an overshoot is scaled back. */
+try {
+  const FIELDS = CORE.concat(REV);
+  Q.tot_core = "date,account_id,platform," + CORE.join(",");
+  Q.tot_rev = "date,account_id,platform," + REV.join(",");
+  const tot = new Map();
+  const add = (r, list, off) => {
+    const gi = gIndex.get(String(r.account_id)), d = di(r.date), pi = platformIdx(r.platform);
+    if (gi == null || pi < 0 || d < 0 || d >= DAYS) return;
+    const k = gi + "|" + d + "|" + pi; const t = tot.get(k) || new Array(FIELDS.length).fill(0);
+    list.forEach((f, i) => { t[off + i] += num(r[f]); }); tot.set(k, t);
+  };
+  for (const r of await load("tot_core")) add(r, CORE, 0);
+  for (const r of await load("tot_rev")) add(r, REV, CORE.length);
+  const byKey = new Map();
+  for (const o of rows.values()) { const k = o[0] + "|" + o[1] + "|" + o[2]; (byKey.get(k) || byKey.set(k, []).get(k)).push(o); }
+  let fixed = 0;
+  for (const [k, t] of tot) {
+    const list = byKey.get(k) || [];
+    FIELDS.forEach((f, i) => {
+      const named = list.reduce((a, o) => a + o[4 + i], 0), diff = t[i] - named;
+      if (diff > 0.5) {
+        const [gi, d, pi] = k.split("|").map(Number), c = ci("ZZ"), rk = gi + "|" + d + "|" + pi + "|" + c;
+        let o = rows.get(rk); if (!o) { o = [gi, d, pi, c].concat(new Array(FIELDS.length).fill(0)); rows.set(rk, o); list.push(o); byKey.set(k, list); }
+        o[4 + i] += diff; fixed++;
+      } else if (diff < -0.5 && named > 0) { const s = t[i] / named; list.forEach((o) => { o[4 + i] *= s; }); fixed++; }
+    });
+  }
+  console.log(`totals reconciled: ${tot.size} game-days, ${fixed} adjustments`);
+} catch (e) { console.log("::warning::Country totals not reconciled: " + e.message); }
 
 const stickRows = [];
 for (const r of stick) {
@@ -115,7 +150,7 @@ const ret = [...retMap.entries()].map(([k, v]) => k.split("|").map(Number).conca
 /* ---- filter slices: the same metrics split by one extra GA4 dimension (no country split, so GA4 does not
    fold rows into "(other)"). Each slice = 2 metric queries (GA4 allows 10 metrics per request) + optional cohorts. */
 const SLICES = [
-  { name: "version", dims: ["app_version"], cohort: true },
+  { name: "version", dims: ["app_version"], cohort: false } /* GA4 tags returning users with the version they run that day, so cohorts by version mix in upgraders (e.g. D1 90%) */,
   { name: "source", dims: ["first_user_primary_channel_group", "first_user_campaign_name"], cohort: true },
   { name: "user", dims: ["new_vs_returning"], cohort: false }
 ];
@@ -192,4 +227,4 @@ const out = {
 };
 if (!games.length) throw new Error("Windsor returned no GA4 properties — check the connector in Windsor.ai");
 await writeFile(join(ROOT, "data", "live.js"), "/* Generated by scripts/fetch-windsor.mjs — do not edit. */\nwindow.GP_LIVE = " + JSON.stringify(out) + ";\n");
-console.log(`live.js written: ${games.length} game(s), ${out.rows.length} rows, ${countries.length} countries, ${ret.length} retention cells, ${iso(from)} → ${iso(today)}`);
+console.log(`live.js written: ${games.length} game(s), ${out.rows.length} rows, ${countries.length} countries, ${ret.length} retention cells, ${iso(from)} → ${iso(end)}`);

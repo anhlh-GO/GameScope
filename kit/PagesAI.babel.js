@@ -236,7 +236,7 @@ function buildContext(F, q) {
   const notes = [
     "Tỉ lệ (retention, arpdau…) là số thập phân: 0.269 = 26.9%. Tiền là USD. Thời gian là giây. null = chưa đủ dữ liệu (cohort chưa đủ tuổi), KHÔNG phải 0.",
     "DAU là trung bình ngày; với tất cả game là tổng DAU từng game. Doanh thu quảng cáo GA4 không tách theo định dạng (interstitial/rewarded/banner).",
-    D.LIVE ? "Chưa có dữ liệu: chi phí UA/CPI, crash, A/B test, level. Không suy đoán các số này." : null
+    D.LIVE ? "Chưa có dữ liệu: chi phí UA/CPI, crash, A/B test" + (D.LEVELS ? "" : ", level") + ". Không suy đoán các số này. Ngày cuối trong dữ liệu là ngày đầy đủ gần nhất (hôm nay chưa được tính)." : null
   ].filter(Boolean);
   return "Bạn là chuyên gia phân tích dữ liệu game mobile. Dưới đây là số liệu xuất từ dashboard GamePulse (" + (D.LIVE ? "dữ liệu thật" : "dữ liệu demo") + ").\n" +
     "Quy tắc: chỉ dùng số trong dữ liệu này, không tự bịa số; không khẳng định nguyên nhân, chỉ nêu điều gì thay đổi, ở đâu và các giả thuyết cần kiểm tra (ghi rõ là giả thuyết); trả lời bằng tiếng Việt, ngắn gọn: 1–2 câu kết luận trước rồi gạch đầu dòng, in đậm số quan trọng.\n" +
