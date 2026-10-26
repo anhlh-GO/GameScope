@@ -2,14 +2,17 @@
 # Cần 1 secret: Settings → Secrets and variables → Actions → New repository secret
 #   Name:  GP_PASSWORD_SHA256
 #   Value: mã SHA-256 của mật khẩu (tạo trong app: Settings → Security → Change password)
-# Và secret WINDSOR_API_KEY: API key Windsor.ai để lấy data GA4 (chạy tự động mỗi 6 giờ)
+# Data GA4 (chạy tự động mỗi 3 giờ) — 1 trong 2 secret:
+#   GA4_SERVICE_ACCOUNT_JSON: toàn bộ nội dung file JSON key của service account (ưu tiên).
+#     Lấy mọi GA4 property đã share quyền Viewer cho email service account.
+#   WINDSOR_API_KEY: API key Windsor.ai (dùng khi chưa có GA4_SERVICE_ACCOUNT_JSON)
 name: Deploy GamePulse
 on:
   push:
     branches: [main]
   workflow_dispatch:
   schedule:
-    - cron: "17 */6 * * *" # mỗi 6 giờ (giờ UTC)
+    - cron: "17 */3 * * *" # mỗi 3 giờ (giờ UTC)
 permissions:
   contents: read
   pages: write
@@ -34,11 +37,12 @@ jobs:
           if ! printf '%s' "$HASH" | grep -Eq '^[0-9a-f]{64}$'; then echo "::error::GP_PASSWORD_SHA256 phải là chuỗi hex 64 ký tự"; exit 1; fi
           sed -i -E "s/passwordSha256: \"[^\"]*\"/passwordSha256: \"$HASH\"/" config.js
           grep -q "$HASH" config.js || { echo "::error::Không chèn được hash vào config.js"; exit 1; }
-      - name: Fetch GA4 data from Windsor.ai
+      - name: Fetch GA4 data
         env:
+          GA4_SERVICE_ACCOUNT_JSON: ${{ secrets.GA4_SERVICE_ACCOUNT_JSON }}
           WINDSOR_API_KEY: ${{ secrets.WINDSOR_API_KEY }}
         run: |
-          if [ -z "$WINDSOR_API_KEY" ]; then echo "::error::Secret WINDSOR_API_KEY chưa được tạo"; exit 1; fi
+          if [ -z "$GA4_SERVICE_ACCOUNT_JSON" ] && [ -z "$WINDSOR_API_KEY" ]; then echo "::error::Chưa có secret GA4_SERVICE_ACCOUNT_JSON (hoặc WINDSOR_API_KEY)"; exit 1; fi
           node scripts/fetch-windsor.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

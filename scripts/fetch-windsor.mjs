@@ -1,9 +1,12 @@
-/* Pulls GA4 data for every connected property from Windsor.ai and writes data/live.js
+/* Pulls GA4 data for every connected property and writes data/live.js
    (window.GP_LIVE), which data/liveAdapter.js turns into GP_DATA.
-   Usage:  WINDSOR_API_KEY=... node scripts/fetch-windsor.mjs
+   Source: the GA4 Data API through a service account (every property shared with it), or Windsor.ai as a fallback.
+   Usage:  GA4_SERVICE_ACCOUNT_JSON='<key json>' node scripts/fetch-windsor.mjs   (or GA4_KEY_FILE=<path to key.json>)
+           WINDSOR_API_KEY=... node scripts/fetch-windsor.mjs
            node scripts/fetch-windsor.mjs --from-dir <folder with core.json, revenue.json, stickiness.json>
    Runs in GitHub Actions (Node 20+, no dependencies). Never logs data values or the key. */
 import { readFile, writeFile } from "node:fs/promises";
+import { createSign } from "node:crypto";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,9 +34,91 @@ const today = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), ne
 const end = today - DAY;
 const from = end - (DAYS - 1) * DAY;
 
+/* ---- GA4 Data API through a service account (no Windsor). Returns rows shaped like Windsor's (same field names,
+   account_id = property id, account_name = property name) so everything below stays source-agnostic. */
+const GA4_MODE = !!(process.env.GA4_SERVICE_ACCOUNT_JSON || process.env.GA4_KEY_FILE);
+const GA4_DIMS = {
+  date: "date", platform: "platform", country_id: "countryId", first_session_date: "firstSessionDate", app_version: "appVersion",
+  first_user_primary_channel_group: "firstUserPrimaryChannelGroup", first_user_campaign_name: "firstUserCampaignName",
+  new_vs_returning: "newVsReturning", event_name: "eventName"
+};
+const GA4_METRICS = {
+  active_users: "activeUsers", newusers: "newUsers", sessions: "sessions", engaged_sessions: "engagedSessions",
+  user_engagement_duration: "userEngagementDuration", event_count: "eventCount", purchase_revenue: "purchaseRevenue",
+  total_ad_revenue: "totalAdRevenue", transactions: "transactions", total_purchasers: "totalPurchasers",
+  first_time_purchasers: "firstTimePurchasers", publisher_ad_impressions: "publisherAdImpressions",
+  active7_day_users: "active7DayUsers", active28_day_users: "active28DayUsers", crash_affected_users: "crashAffectedUsers", users: "totalUsers"
+};
+let ga4Token = null, ga4Props = null;
+/* the first queries run in parallel: cache the promise, not the value, so sign-in and discovery happen once */
+function ga4Auth() { return ga4Token || (ga4Token = ga4SignIn()); }
+async function ga4SignIn() {
+  const key = JSON.parse(process.env.GA4_SERVICE_ACCOUNT_JSON || await readFile(process.env.GA4_KEY_FILE, "utf8"));
+  const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+  const now = Math.floor(Date.now() / 1000);
+  const unsigned = b64({ alg: "RS256", typ: "JWT" }) + "." + b64({ iss: key.client_email, scope: "https://www.googleapis.com/auth/analytics.readonly", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 });
+  const jwt = unsigned + "." + createSign("RSA-SHA256").update(unsigned).sign(key.private_key, "base64url");
+  const res = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }) });
+  const tok = await res.json();
+  if (!tok.access_token) throw new Error(`GA4 service account sign-in failed: ${tok.error || res.status}`);
+  return tok.access_token;
+}
+async function ga4Fetch(url, body) {
+  for (let attempt = 1; ; attempt++) {
+    const res = await fetch(url, { method: body ? "POST" : "GET", headers: { authorization: "Bearer " + await ga4Auth(), "content-type": "application/json" }, body: body && JSON.stringify(body), signal: AbortSignal.timeout(300000) });
+    const json = await res.json().catch(() => ({}));
+    if (res.ok) return json;
+    if (attempt >= 3 || (res.status !== 429 && res.status < 500)) throw new Error(`HTTP ${res.status} ${(json.error && json.error.message || "").slice(0, 300)}`);
+    await new Promise((r) => setTimeout(r, 5000 * attempt));
+  }
+}
+/* every property shared with the service account; GA4_PROPERTIES="123,456" limits the list */
+function ga4Properties() { return ga4Props || (ga4Props = ga4Discover()); }
+async function ga4Discover() {
+  const only = (process.env.GA4_PROPERTIES || "").split(/[\s,]+/).filter(Boolean), list = [];
+  let page = "";
+  do {
+    const j = await ga4Fetch("https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=200" + (page ? "&pageToken=" + page : ""));
+    for (const a of j.accountSummaries || []) for (const p of a.propertySummaries || []) list.push({ id: p.property.replace("properties/", ""), name: p.displayName });
+    page = j.nextPageToken || "";
+  } while (page);
+  const props = only.length ? list.filter((p) => only.includes(p.id)) : list;
+  console.log(`GA4 properties: ${props.length}`);
+  return props;
+}
+async function ga4Load(name, fields, filter) {
+  const dims = [], mets = [];
+  for (const f of fields.split(",")) {
+    if (f === "account_id" || f === "account_name") continue;
+    if (GA4_DIMS[f]) dims.push([f, GA4_DIMS[f]]); else if (GA4_METRICS[f]) mets.push([f, GA4_METRICS[f]]); else throw new Error(`no GA4 mapping for field '${f}'`);
+  }
+  const exprs = (filter || []).map(([f, op, v]) => ({ filter: { fieldName: GA4_DIMS[f], stringFilter: { matchType: op === "contains" ? "CONTAINS" : "EXACT", value: String(v) } } }));
+  const out = [];
+  for (const p of await ga4Properties()) {
+    try {
+      for (let offset = 0; ;) {
+        const j = await ga4Fetch(`https://analyticsdata.googleapis.com/v1beta/properties/${p.id}:runReport`, {
+          dateRanges: [{ startDate: iso(from), endDate: iso(end) }], dimensions: dims.map((d) => ({ name: d[1] })), metrics: mets.map((m) => ({ name: m[1] })),
+          dimensionFilter: exprs.length ? { andGroup: { expressions: exprs } } : undefined, limit: 100000, offset
+        });
+        for (const r of j.rows || []) {
+          const o = { account_id: p.id, account_name: p.name };
+          dims.forEach(([f], i) => { const v = r.dimensionValues[i].value; o[f] = f === "date" ? v.slice(0, 4) + "-" + v.slice(4, 6) + "-" + v.slice(6) : v; });
+          mets.forEach(([f], i) => { o[f] = Number(r.metricValues[i].value); });
+          out.push(o);
+        }
+        offset += (j.rows || []).length;
+        if (!(j.rows || []).length || offset >= (j.rowCount || 0)) break;
+      }
+    } catch (e) { console.log(`::warning::GA4 '${name}' skipped for property ${p.id} (${p.name}): ${e.message}`); }
+  }
+  return out;
+}
+
 async function load(name) {
   const dirArg = process.argv.indexOf("--from-dir");
   if (dirArg > 0) return JSON.parse((await readFile(join(process.argv[dirArg + 1], name + ".json"), "utf8")).replace(/^﻿/, "")).data || [];
+  if (GA4_MODE) return ga4Load(name, Q[name], QF[name]);
   const key = process.env.WINDSOR_API_KEY;
   if (!key) throw new Error("WINDSOR_API_KEY is not set");
   const url = `${BASE}?api_key=${encodeURIComponent(key)}&date_from=${iso(from)}&date_to=${iso(end)}&fields=${Q[name]}` + (QF[name] ? `&filter=${encodeURIComponent(JSON.stringify(QF[name]))}` : "");
@@ -217,7 +302,7 @@ try {
 } catch (e) { console.log("::warning::Levels not updated: " + e.message); }
 
 const out = {
-  v: 1, source: "GA4 via Windsor.ai", updatedAt: Date.now(), from: iso(from), days: DAYS,
+  v: 1, source: GA4_MODE ? "GA4 Data API" : "GA4 via Windsor.ai", updatedAt: Date.now(), from: iso(from), days: DAYS,
   games, countries, fields: CORE.concat(REV),
   rows: [...rows.values()].sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((r) => r.map(round)),
   stick: stickRows,
@@ -225,6 +310,6 @@ const out = {
   levels: { types: LEVEL_TYPES, rows: levelRows }, /* rows: [gi, di, pi, level, typeIdx, eventCount, users] */
   slices /* { name: { dims, vals[dim][], rows: [gi, di, pi, ...dimIdx, ...fields], ret: [gi, c, pi, ...dimIdx, n, users] } } */
 };
-if (!games.length) throw new Error("Windsor returned no GA4 properties — check the connector in Windsor.ai");
+if (!games.length) throw new Error(GA4_MODE ? "No GA4 properties returned — share them with the service account (Viewer)" : "Windsor returned no GA4 properties — check the connector in Windsor.ai");
 await writeFile(join(ROOT, "data", "live.js"), "/* Generated by scripts/fetch-windsor.mjs — do not edit. */\nwindow.GP_LIVE = " + JSON.stringify(out) + ";\n");
 console.log(`live.js written: ${games.length} game(s), ${out.rows.length} rows, ${countries.length} countries, ${ret.length} retention cells, ${iso(from)} → ${iso(end)}`);
