@@ -277,24 +277,46 @@ for (const s of SLICES) {
 
 const round = round4;
 /* ---- levels: per-level events. Default naming (Falcon template): game_main_start_<n>, game_main_victory_<n>,
-   optional game_main_lose_<n> / _fail_ / _quit_ / _revive_. Override the prefix per game in data/games.json ("levelPrefix"). */
-const LEVEL_TYPES = ["start", "victory", "lose", "fail", "quit", "revive"];
+   optional game_main_lose_<n> / _fail_ / _quit_ / _revive_. Override per game in data/games.json:
+   - "levelPrefix": "xyz_"  → xyz_start_<n>, xyz_victory_<n>, …
+   - "levelEvents": { "start": "PLAY_LEVEL_", "victory": "WIN_LEVEL_", "room": "PLAY_ROOM_" }  → one event prefix per type,
+     followed directly by the number (exact case). "room" = entering room <n> (rooms funnel). */
+const LEVEL_TYPES = ["start", "victory", "lose", "fail", "quit", "revive", "room"];
 let levelRows = [];
 try {
-  const prefixes = [...new Set(["game_main_"].concat(Object.values(overrides).map((o) => o.levelPrefix).filter(Boolean)))];
   Q.levels = "date,account_id,platform,event_name,event_count,users";
+  const okPre = (p) => typeof p === "string" && /^[A-Za-z0-9_]+$/.test(p);
+  /* query prefix → rules { acc: account id (null = every game without an override), re, type (null = from the match) } */
+  const queries = new Map(), rule = (pre, r) => { if (!queries.has(pre)) queries.set(pre, []); queries.get(pre).push(r); };
+  const custom = new Set();
+  for (const [acc, o] of Object.entries(overrides)) {
+    if (o.levelEvents) {
+      for (const [t, pre] of Object.entries(o.levelEvents)) {
+        if (!LEVEL_TYPES.includes(t) || !okPre(pre)) { console.log("::warning::Ignoring levelEvents." + t + " for " + acc); continue; }
+        rule(pre, { acc, type: t, re: new RegExp("^" + pre + "(\\d+)$") });
+      }
+      custom.add(acc);
+    } else if (o.levelPrefix) {
+      if (!okPre(o.levelPrefix)) { console.log("::warning::Ignoring invalid levelPrefix " + JSON.stringify(o.levelPrefix)); continue; }
+      rule(o.levelPrefix, { acc, type: null, re: new RegExp("^" + o.levelPrefix + "(" + LEVEL_TYPES.join("|") + ")_(\\d+)$") });
+      custom.add(acc);
+    }
+  }
+  rule("game_main_", { acc: null, type: null, re: /^game_main_(start|victory|lose|fail|quit|revive)_(\d+)$/ });
   const lm = new Map();
-  for (const pre of prefixes) {
+  for (const [pre, rules] of queries) {
     QF.levels = [["event_name", "contains", pre]];
-    if (!/^[A-Za-z0-9_]+$/.test(pre)) { console.log("::warning::Ignoring invalid levelPrefix " + JSON.stringify(pre)); continue; }
-    const re = new RegExp("^" + pre + "(" + LEVEL_TYPES.join("|") + ")_(\\d+)$");
     for (const r of await load("levels")) {
-      const gi = gIndex.get(String(r.account_id)), d = di(r.date), pi = platformIdx(r.platform);
-      const o = overrides[String(r.account_id)] || {};
-      if (gi == null || pi < 0 || d < 0 || d >= DAYS || (o.levelPrefix || "game_main_") !== pre) continue;
-      const m = re.exec(String(r.event_name)); if (!m) continue;
-      const k = [gi, d, pi, +m[2], LEVEL_TYPES.indexOf(m[1])].join("|");
-      const v = lm.get(k) || [0, 0]; v[0] += num(r.event_count); v[1] += num(r.users); lm.set(k, v);
+      const acc = String(r.account_id), gi = gIndex.get(acc), d = di(r.date), pi = platformIdx(r.platform);
+      if (gi == null || pi < 0 || d < 0 || d >= DAYS) continue;
+      for (const ru of rules) {
+        if (ru.acc ? ru.acc !== acc : custom.has(acc)) continue;
+        const m = ru.re.exec(String(r.event_name)); if (!m) continue;
+        const t = ru.type || m[1], n = +(ru.type ? m[1] : m[2]);
+        const k = [gi, d, pi, n, LEVEL_TYPES.indexOf(t)].join("|");
+        const v = lm.get(k) || [0, 0]; v[0] += num(r.event_count); v[1] += num(r.users); lm.set(k, v);
+        break;
+      }
     }
   }
   levelRows = [...lm.entries()].map(([k, v]) => k.split("|").map(Number).concat(v));

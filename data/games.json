@@ -1,0 +1,5 @@
+{
+  "544995366": {
+    "levelEvents": { "start": "PLAY_LEVEL_", "victory": "WIN_LEVEL_", "room": "PLAY_ROOM_" }
+  }
+}

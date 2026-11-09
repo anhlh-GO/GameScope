@@ -22,11 +22,12 @@ function LevelsPage() {
   const R = GP.ranges(F);
   const L = React.useMemo(function () { return g && !g.nonlinear ? GP.levels(F) : null; }, [key]);
   const Lp = React.useMemo(function () { return g && !g.nonlinear && R.cFrom != null && R.cFrom >= 0 ? GP.levels(Object.assign({}, F, { from: R.cFrom, to: R.cTo })) : null; }, [key]);
+  const Rm = React.useMemo(function () { return g && GP.rooms ? GP.rooms(F) : null; }, [key]);
   if (!g) return <div><PageHeader title="Level Analytics" desc={window.ROUTES[4].desc} /><NeedGame reason="Level structures differ per game, so levels are analysed one game at a time." /></div>;
   if (g.nonlinear) return <NonLinear key={g.id} F={F} g={g} loading={loading} k={key} />;
   if (!L) return <div><PageHeader title={"Level Analytics · " + g.name} desc={window.ROUTES[4].desc} />
     <Callout tone="info" title="Chưa có dữ liệu level cho game này trong khoảng thời gian đã chọn">
-      Trang này đọc các event GA4 dạng <code>game_main_start_N</code> và <code>game_main_victory_N</code> (tuỳ chọn <code>game_main_lose_N</code>, <code>game_main_quit_N</code>). Nếu game dùng tên event khác, thêm <code>"levelPrefix"</code> cho game đó trong <code>data/games.json</code>, hoặc chọn khoảng thời gian dài hơn.
+      Trang này đọc các event GA4 dạng <code>game_main_start_N</code> và <code>game_main_victory_N</code> (tuỳ chọn <code>game_main_lose_N</code>, <code>game_main_quit_N</code>). Nếu game dùng tên event khác, khai báo cho game đó trong <code>data/games.json</code>: <code>"levelPrefix"</code> (ví dụ <code>xyz_start_N</code>) hoặc <code>"levelEvents"</code> (ví dụ <code>{"{"}"start": "PLAY_LEVEL_", "victory": "WIN_LEVEL_", "room": "PLAY_ROOM_"{"}"}</code>), hoặc chọn khoảng thời gian dài hơn.
     </Callout></div>;
   const LIVE = !!L.live;
   const T = levelTotals(L), Tp = levelTotals(Lp);
@@ -79,8 +80,20 @@ function LevelsPage() {
         </Cols>
       </Section>
       <Section title="Level performance">
-        <Card><DataTable dense rowKey="level" rows={L.levels} columns={cols} pageSize={15} onRowClick={setDetail} footerNote={LIVE ? "GA4 events game_main_start_N / game_main_victory_N. Win rate per attempt; drop-off = players who won the level but never started the next one. Players are summed daily unique users; levels with < 30 players are noisy." : "Rates in this table: win rate & booster usage per attempt; drop-off per unique player."} /></Card>
+        <Card><DataTable dense rowKey="level" rows={L.levels} columns={cols} pageSize={15} onRowClick={setDetail} footerNote={LIVE ? "GA4 level start / victory events (game_main_start_N / game_main_victory_N, or the names set for this game in data/games.json). Win rate per attempt; drop-off = players who won the level but never started the next one. Players are summed daily unique users; levels with < 30 players are noisy." : "Rates in this table: win rate & booster usage per attempt; drop-off per unique player."} /></Card>
       </Section>
+      {Rm ? <Section title="Rooms">
+        <Cols min={440}>
+          <ChartCard loading={loading} title="Players by room" subtitle="Σ daily unique users entering each room">
+            <BarChart data={Rm.rooms} xKey="label" yFormat={fmt.int} series={[{ key: "players", label: "Players", color: "var(--accent)" }]} />
+          </ChartCard>
+          <Card><DataTable dense rowKey="room" rows={Rm.rooms} pageSize={15} columns={[
+            { key: "label", header: "Room", align: "left" }, { key: "players", header: "Players (Σ daily users)", format: fmt.int }, { key: "entries", header: "Entries", format: fmt.int },
+            { key: "perPlayer", header: "Entries / player", format: function (v) { return fmt.num(v, 1); } }, { key: "reachRate", header: "Reach vs room 0", format: P },
+            { key: "drop", header: "Drop to next room", format: P, cellStyle: function (r) { return r.drop > .5 ? { color: "var(--negative)" } : null; } }
+          ]} footerNote="GA4 room events set in data/games.json (e.g. PLAY_ROOM_N). Drop = players in this room who never enter the next one; rooms with < 30 players are noisy." /></Card>
+        </Cols>
+      </Section> : null}
       <LevelDialog lv={detail} g={g} onClose={function () { setDetail(null); }} />
     </div>
   );

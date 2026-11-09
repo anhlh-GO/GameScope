@@ -93,7 +93,11 @@
     if (r[1] >= N || !LEVELS[r[0]]) return;
     LEVELS[r[0]].push({ di: r[1], pi: r[2], n: r[3], t: LT[r[4]], c: r[5], u: r[6] });
   });
-  LEVELS.forEach(function (rows, gi) { let mx = 0; rows.forEach(function (x) { if (x.t === "start" && x.n > mx) mx = x.n; }); GAMES[gi].levels = mx; });
+  LEVELS.forEach(function (rows, gi) {
+    let mx = 0, rooms = 0;
+    rows.forEach(function (x) { if (x.t === "start" && x.n > mx) mx = x.n; if (x.t === "room" && x.n + 1 > rooms) rooms = x.n + 1; });
+    GAMES[gi].levels = mx; GAMES[gi].rooms = rooms; /* rooms are 0-based: PLAY_ROOM_0 … */
+  });
 
   Object.assign(D, {
     LEVELS: LEVELS,

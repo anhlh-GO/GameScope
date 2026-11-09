@@ -193,6 +193,27 @@
     if (!out.length) return null;
     return { game: g, players: get(1, "start").u, levels: out, hardShare: 0, live: true, failsAreUnwon: !hasLose };
   }
+  /* live rooms funnel (event "room" = entering room n, 0-based). Players = Σ daily unique users. */
+  function rooms(F) {
+    const g = D.GAMES.find(function (x) { return x.id === F.game; });
+    const gi = D.GAMES.indexOf(g);
+    if (!g || !g.rooms || !D.LEVELS || !D.LEVELS[gi]) return null;
+    const R = ranges(F), A = {};
+    D.LEVELS[gi].forEach(function (x) {
+      if (x.t !== "room" || x.di < R.from || x.di > R.to) return;
+      if (F.platform && F.platform !== "all" && D.PLATFORMS[x.pi].id !== F.platform) return;
+      const a = A[x.n] || (A[x.n] = { c: 0, u: 0 }); a.c += x.c; a.u += x.u;
+    });
+    const out = [];
+    for (let n = 0; n < g.rooms; n++) {
+      const a = A[n] || { c: 0, u: 0 }, nx = n + 1 < g.rooms ? (A[n + 1] || { u: 0 }).u : null;
+      out.push({ id: n, room: n, label: "Room " + n, players: a.u, entries: a.c, perPlayer: a.u ? a.c / a.u : null,
+        drop: nx == null || !a.u ? null : Math.max(0, Math.min(1, 1 - nx / a.u)), small: a.u < 30 });
+    }
+    const base = out[0] && out[0].players || 0;
+    out.forEach(function (r) { r.reachRate = base ? r.players / base : null; });
+    return out.some(function (r) { return r.players; }) ? { game: g, rooms: out } : null;
+  }
   function levels(F) {
     if (D.LEVELS) return liveLevels(F);
     const g = D.GAMES.find(function (x) { return x.id === F.game; });
@@ -535,6 +556,6 @@
   };
 
   window.GP = { D: D, SF: SF, RN: RN, agg: agg, derive: derive, summary: summary, delta: delta, ranges: ranges, retention: retention, retentionBy: retentionBy, retentionByFirstLevel: retentionByFirstLevel,
-    levels: levels, levelTimeDist: levelTimeDist, nonlinear: nonlinear, campaigns: campaigns, uaSummary: uaSummary, tech: tech, events: events, paramBreakdown: paramBreakdown, funnel: funnel,
+    levels: levels, rooms: rooms, levelTimeDist: levelTimeDist, nonlinear: nonlinear, campaigns: campaigns, uaSummary: uaSummary, tech: tech, events: events, paramBreakdown: paramBreakdown, funnel: funnel,
     DEFAULT_RULES: DEFAULT_RULES, runAlerts: runAlerts, experiment: experiment, KPI_INFO: KPI_INFO, FX: FX, cfg: cfg, fmt: fmt, gameIdx: gameIdx, versionShares: versionShares };
 })();
