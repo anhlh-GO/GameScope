@@ -37,6 +37,18 @@ jobs:
           if ! printf '%s' "$HASH" | grep -Eq '^[0-9a-f]{64}$'; then echo "::error::GP_PASSWORD_SHA256 phải là chuỗi hex 64 ký tự"; exit 1; fi
           sed -i -E "s/passwordSha256: \"[^\"]*\"/passwordSha256: \"$HASH\"/" config.js
           grep -q "$HASH" config.js || { echo "::error::Không chèn được hash vào config.js"; exit 1; }
+      - name: Inject game-manager sync settings (optional)
+        env:
+          GM_SYNC_URL: ${{ secrets.GM_SYNC_URL }}
+          GM_SYNC_TOKEN: ${{ secrets.GM_SYNC_TOKEN }}
+        run: |
+          if [ -z "$GM_SYNC_URL" ]; then echo "GM_SYNC_URL chưa có — trang Quản lý game chỉ lưu trên từng máy"; exit 0; fi
+          node -e '
+            const fs = require("fs"); let s = fs.readFileSync("config.js", "utf8");
+            const set = (k, v) => { s = s.replace(new RegExp(k + ": \"[^\"]*\""), k + ": " + JSON.stringify(v)); };
+            set("gmSyncUrl", process.env.GM_SYNC_URL.trim()); set("gmSyncToken", (process.env.GM_SYNC_TOKEN || "").trim());
+            fs.writeFileSync("config.js", s);'
+          grep -q 'gmSyncUrl: "https' config.js || { echo "::error::Không chèn được GM_SYNC_URL vào config.js"; exit 1; }
       - name: Fetch GA4 data
         env:
           GA4_SERVICE_ACCOUNT_JSON: ${{ secrets.GA4_SERVICE_ACCOUNT_JSON }}
@@ -44,6 +56,14 @@ jobs:
         run: |
           if [ -z "$GA4_SERVICE_ACCOUNT_JSON" ] && [ -z "$WINDSOR_API_KEY" ]; then echo "::error::Chưa có secret GA4_SERVICE_ACCOUNT_JSON (hoặc WINDSOR_API_KEY)"; exit 1; fi
           node scripts/fetch-windsor.mjs
+      # Danh sách game cho trang "Quản lý game": sheet "Tạo ID Game_Publisher_new" (cấu hình cột: data/games-map.json).
+      # Cần share sheet (Viewer) cho email service account và bật Google Sheets API cho project của nó.
+      # Lỗi ở bước này không chặn deploy — trang sẽ báo "Chưa kéo được sheet".
+      - name: Fetch game list (Google Sheet)
+        continue-on-error: true
+        env:
+          GA4_SERVICE_ACCOUNT_JSON: ${{ secrets.GA4_SERVICE_ACCOUNT_JSON }}
+        run: node scripts/fetch-games.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

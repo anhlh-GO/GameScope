@@ -23,7 +23,7 @@ const Q = {
 };
 /* server-side filters per query (Windsor 'filter' param) */
 const QF = {};
-const RET_DAYS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 30];
+const RET_DAYS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 28, 30]; /* 28: benchmark column on the game-manager page */
 const CORE = ["active_users", "newusers", "sessions", "engaged_sessions", "user_engagement_duration", "event_count"];
 const REV = ["purchase_revenue", "total_ad_revenue", "transactions", "total_purchasers", "first_time_purchasers", "publisher_ad_impressions"];
 

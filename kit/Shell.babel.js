@@ -162,7 +162,7 @@ function FilterBar({ F, setF, route, mobile, onReset, onSave, presets, onPreset,
   const sliceOn = window.sliceActive(F);
   /* picking one slice filter clears the others: GA4 slices are fetched one dimension at a time */
   const only = function (patch) { return Object.assign(SL ? { version: "all", source: "all", campaign: "all", userType: "all" } : {}, patch); };
-  const show = !(route === "sources" || route === "settings");
+  const show = !(route === "sources" || route === "settings" || route === "games");
   if (!show) return null;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: mobile ? "nowrap" : "wrap", overflowX: mobile ? "auto" : "visible", padding: mobile ? "8px 12px" : "8px 20px", borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-app)" }}>

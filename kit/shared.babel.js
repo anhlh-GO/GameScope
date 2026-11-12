@@ -17,7 +17,8 @@ const ROUTES = [
   { id: "events", label: "Event Explorer", icon: "mouse-pointer-click", group: "Intelligence", desc: "Custom events: counts, unique users, parameters and ad-hoc funnels." },
   { id: "reports", label: "Reports", icon: "file-text", group: "Workspace", desc: "Saved views, custom reports, exports and schedules." },
   { id: "sources", label: "Data Sources", icon: "database", group: "Workspace", desc: "Connector status, the metric dictionary, and the data model behind every chart." },
-  { id: "settings", label: "Settings", icon: "settings", group: "Workspace", desc: "Appearance, locale, security and workspace preferences." }
+  { id: "settings", label: "Settings", icon: "settings", group: "Workspace", desc: "Appearance, locale, security and workspace preferences." },
+  { id: "games", label: "Quản lý game", icon: "folder-kanban", group: "Portfolio", desc: "Danh sách game đồng bộ từ sheet publisher: trạng thái, người phụ trách, thư mục Drive, ghi chú và tài liệu tích hợp." }
 ];
 
 const NA = {
@@ -34,12 +35,12 @@ const SL = D.SLICES || {};
 const ALL = { game: 1, platform: 1, countries: 1, version: SL.version ? 1 : 0, source: SL.source ? 1 : 0, campaign: SL.source ? 1 : 0, userType: SL.user ? 1 : 0, compare: 1 };
 const APPLY = {
   portfolio: Object.assign({}, ALL, { game: 0 }), overview: ALL, engagement: Object.assign({}, ALL, { userType: 1 }), retention: Object.assign({}, ALL, { userType: 0 }), levels: ALL, monetization: ALL,
-  ua: Object.assign({}, ALL, { source: 1, campaign: 1 }), tech: Object.assign({}, ALL, { countries: 0, version: D.LIVE ? 0 : 1 }), ai: ALL, alerts: { compare: 0 }, ab: { game: 1 }, events: ALL, reports: ALL, sources: {}, settings: {}
+  ua: Object.assign({}, ALL, { source: 1, campaign: 1 }), tech: Object.assign({}, ALL, { countries: 0, version: D.LIVE ? 0 : 1 }), ai: ALL, alerts: { compare: 0 }, ab: { game: 1 }, events: ALL, reports: ALL, sources: {}, settings: {}, games: {}
 };
 /* live GA4 slices have no country split and don't combine with each other */
 function sliceActive(F) { return !!(D.SLICES && ((F.version && F.version !== "all") || (F.source && F.source !== "all") || (F.campaign && F.campaign !== "all") || (F.userType && F.userType !== "all"))); }
 function reasonFor(route, key) {
-  if (route === "alerts" || route === "sources" || route === "settings") return NA.own;
+  if (route === "alerts" || route === "sources" || route === "settings" || route === "games") return NA.own;
   if (route === "ab") return NA.ab;
   if (key === "game") return NA.game;
   if (key === "version") return D.LIVE && route === "tech" ? "Crash data by version isn't connected yet." : NA.version;
@@ -150,7 +151,7 @@ function NeedGame({ reason, filter }) {
 }
 function SimGate({ route, children }) {
   const app = useApp();
-  const s = route === "settings" ? "none" : app.sim;
+  const s = route === "settings" || route === "games" ? "none" : app.sim;
   if (s === "loading") return <Card><EmptyState kind="loading" description="Simulated: waiting on the analytics API." /></Card>;
   if (s === "error") return <Card><EmptyState kind="error" description="Simulated: BigQuery job failed (timeout after 30s). No partial data is shown." action={<Button iconLeft="refresh-cw" onClick={function () { app.setSim("none"); }}>Retry</Button>} /></Card>;
   if (s === "empty") return <Card><EmptyState kind="empty" description="Simulated: no rows match the current filters. Try widening the date range or clearing country filters." action={<Button iconLeft="rotate-ccw" onClick={function () { app.setSim("none"); }}>Reset</Button>} /></Card>;

@@ -1,0 +1,21 @@
+{
+  "sheetId": "1EDavCzq019cxSgVQczAZeeKIEJRjTBVvPcdQlr9PvwA",
+  "gid": 954358539,
+  "headerRow": 2,
+  "firstDataRow": 4,
+  "fields": {
+    "created": { "column": ["A", "AR"] },
+    "ua": { "column": "B" },
+    "mo": { "column": "C" },
+    "live": { "column": "F" },
+    "partner": { "column": "I" },
+    "name": { "column": "J" },
+    "pkg": { "column": "K" },
+    "platform": { "column": "L" },
+    "firebase": { "column": "M" },
+    "tracking": { "column": "P" },
+    "mediation": { "column": "W" },
+    "note": { "column": "AS" },
+    "drive": { "column": "AV", "type": "link" }
+  }
+}

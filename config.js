@@ -11,6 +11,9 @@
    site behind server-side auth (Cloudflare Access, Vercel/Netlify password, or the API backend). */
 window.GP_CONFIG = {
   passwordSha256: "REPLACED_AT_DEPLOY",
+  /* "Quản lý game": nơi lưu chung (Apps Script web app, scripts/gm-sync.gs). Điền lúc deploy từ secret GM_SYNC_URL / GM_SYNC_TOKEN; để trống = chỉ lưu trên từng máy. */
+  gmSyncUrl: "",
+  gmSyncToken: "",
   sessionHours: 12,
   maxAttempts: 5,
   lockoutSeconds: 30
